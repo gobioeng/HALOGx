@@ -37,7 +37,16 @@ class UnifiedParser:
         self.fault_codes: Dict[str, Dict[str, str]] = {}
         self.parameter_mapping = {}  # Initialize before calling _init_parameter_mapping
         self.df: Optional[pd.DataFrame] = None # Initialize df to None
-        self._init_parameter_mapping()  # Call after other initializations
+        
+        # Initialize parameter configuration manager
+        try:
+            from parameter_config_manager import ParameterConfigManager
+            self.param_config_manager = ParameterConfigManager()
+            self._load_dynamic_parameter_mapping()
+        except ImportError:
+            print("⚠️ ParameterConfigManager not available, using static mapping")
+            self.param_config_manager = None
+            self._init_parameter_mapping()  # Fall back to static mapping
 
     def get_fault_descriptions_by_database(self, fault_code):
         """Get fault descriptions from both HAL and TB databases"""
@@ -83,6 +92,44 @@ class UnifiedParser:
             "serial_alt": re.compile(r"Serial[:\s]+(\d+)", re.IGNORECASE),
             "machine_id": re.compile(r"Machine[:\s]+(\d+)", re.IGNORECASE),
         }
+
+    def _load_dynamic_parameter_mapping(self):
+        """Load parameter mapping from ParameterConfigManager"""
+        if self.param_config_manager is None:
+            return
+            
+        try:
+            # Get all parameters from config manager
+            dynamic_mapping = self.param_config_manager.get_all_parameters()
+            
+            # Convert to format expected by UnifiedParser
+            self.parameter_mapping = {}
+            for param_name, config in dynamic_mapping.items():
+                self.parameter_mapping[param_name] = {
+                    "patterns": config.get("patterns", [param_name]),
+                    "unit": config.get("unit", ""),
+                    "description": config.get("description", param_name),
+                    "expected_range": config.get("expected_range"),
+                    "critical_range": config.get("critical_range"),
+                    "parameter_type": config.get("parameter_type", "general")
+                }
+                
+            print(f"✅ Loaded {len(self.parameter_mapping)} parameters from dynamic config")
+            
+            # Validate the mapping
+            warnings, errors = self.param_config_manager.validate_parameter_mapping()
+            if warnings:
+                print(f"⚠️ Parameter mapping warnings: {len(warnings)}")
+                for warning in warnings[:3]:  # Show first 3 warnings
+                    print(f"   • {warning}")
+            if errors:
+                print(f"❌ Parameter mapping errors: {len(errors)}")
+                for error in errors[:3]:  # Show first 3 errors
+                    print(f"   • {error}")
+                    
+        except Exception as e:
+            print(f"❌ Error loading dynamic parameter mapping: {e}")
+            self._init_parameter_mapping()  # Fall back to static mapping
 
     def _init_parameter_mapping(self):
         """Initialize comprehensive parameter mapping for all parameters"""
@@ -1305,3 +1352,60 @@ class UnifiedParser:
 
         except Exception as e:
             return pd.DataFrame()
+            
+    def reload_parameter_mapping(self) -> bool:
+        """Reload parameter mapping from configuration file"""
+        if self.param_config_manager is None:
+            print("⚠️ Parameter config manager not available")
+            return False
+            
+        try:
+            print("🔄 Reloading parameter mapping...")
+            success = self.param_config_manager.reload_config()
+            if success:
+                self._load_dynamic_parameter_mapping()
+                print("✅ Parameter mapping reloaded successfully")
+            return success
+        except Exception as e:
+            print(f"❌ Error reloading parameter mapping: {e}")
+            return False
+            
+    def enable_parameter_auto_reload(self, check_interval: float = 2.0):
+        """Enable auto-reload of parameter mapping when config file changes"""
+        if self.param_config_manager is None:
+            print("⚠️ Parameter config manager not available")
+            return
+            
+        self.param_config_manager.enable_auto_reload(check_interval)
+        
+    def disable_parameter_auto_reload(self):
+        """Disable auto-reload of parameter mapping"""
+        if self.param_config_manager is None:
+            return
+            
+        self.param_config_manager.disable_auto_reload()
+        
+    def get_parameter_statistics(self) -> Dict:
+        """Get statistics about parameter mapping"""
+        if self.param_config_manager is None:
+            return {
+                "total_parameters": len(self.parameter_mapping),
+                "source": "static_mapping",
+                "auto_reload_enabled": False
+            }
+            
+        stats = self.param_config_manager.get_statistics()
+        stats["source"] = "dynamic_mapping"
+        return stats
+        
+    def find_parameter_by_log_name(self, log_parameter_name: str) -> Optional[str]:
+        """Find mapped parameter name by log parameter name"""
+        if self.param_config_manager is None:
+            # Fall back to basic pattern matching
+            for param_name, config in self.parameter_mapping.items():
+                patterns = config.get("patterns", [])
+                if log_parameter_name in patterns:
+                    return param_name
+            return None
+            
+        return self.param_config_manager.find_parameter_by_pattern(log_parameter_name)

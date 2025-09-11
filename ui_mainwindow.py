@@ -31,12 +31,7 @@ class Ui_MainWindow:
         self.trend_sub_tabs = None
         self.chart_widgets = {}
         
-        # Data table components
-        self.data_tab = None
-        self.data_table = None
-        self.table_info_label = None
-        self.limit_combo = None
-        self.table_param_combo = None
+        # Data table components - REMOVED
         
         # Fault code components
         self.fault_tab = None
@@ -181,8 +176,7 @@ class Ui_MainWindow:
         # Trends tab with sub-tabs
         self.create_trends_tab()
         
-        # Data table tab
-        self.create_data_tab()
+        # Data table tab - REMOVED for streamlined interface
         
         # Fault Code tab
         self.create_fault_code_tab()
@@ -199,7 +193,7 @@ class Ui_MainWindow:
         layout.setContentsMargins(20, 20, 20, 20)
         
         # Welcome section
-        welcome_label = QLabel("<h2>📊 HALog Dashboard</h2><p>Professional LINAC Water System Monitoring</p>")
+        welcome_label = QLabel("<h2>📊 HALog Dashboard</h2><p>Professional LINAC Monitoring System</p>")
         layout.addWidget(welcome_label)
         
         # Summary cards
@@ -249,6 +243,9 @@ class Ui_MainWindow:
         
         # Fan Speeds tab
         self.setup_fan_speeds_tab()
+        
+        # Threshold Analysis tab (NEW)
+        self.setup_threshold_analysis_tab()
         
         layout.addWidget(self.trend_sub_tabs)
         self.tab_widget.addTab(self.trends_tab, "📈 Trends")
@@ -397,46 +394,59 @@ class Ui_MainWindow:
         chart_placeholder.setMinimumHeight(400)
         chart_placeholder.setStyleSheet("border: 1px solid #ccc; background: #f9f9f9;")
         layout.addWidget(chart_placeholder)
+
+    def setup_threshold_analysis_tab(self):
+        """Setup advanced threshold analysis sub-tab"""
+        try:
+            from threshold_plot_widget import ThresholdPlotWidget
+            
+            tab_threshold = QWidget()
+            self.trend_sub_tabs.addTab(tab_threshold, "⚠️ Threshold Analysis")
+            layout = QVBoxLayout(tab_threshold)
+            
+            # Info section
+            info_label = QLabel(
+                "<h3>Advanced Threshold Monitoring</h3>"
+                "<p>Professional LINAC parameter monitoring with configurable thresholds, alert zones, and violation detection.</p>"
+                "<ul>"
+                "<li><b>Green zones:</b> Normal operating ranges</li>"
+                "<li><b>Orange zones:</b> Warning thresholds</li>"
+                "<li><b>Red zones:</b> Critical thresholds</li>"
+                "<li><b>Markers:</b> Real-time violation indicators</li>"
+                "</ul>"
+            )
+            info_label.setWordWrap(True)
+            info_label.setStyleSheet("""
+                QLabel {
+                    background-color: #E3F2FD;
+                    border: 1px solid #BBDEFB;
+                    border-radius: 8px;
+                    padding: 12px;
+                    margin: 5px;
+                    font-size: 11px;
+                }
+            """)
+            layout.addWidget(info_label)
+            
+            # Create the threshold plot widget
+            self.threshold_plot_widget = ThresholdPlotWidget()
+            layout.addWidget(self.threshold_plot_widget)
+            
+            # Store reference for main window access
+            self.chart_widgets['threshold_analysis'] = self.threshold_plot_widget
+            
+        except ImportError as e:
+            # Fallback if ThresholdPlotWidget is not available
+            tab_threshold = QWidget()
+            self.trend_sub_tabs.addTab(tab_threshold, "⚠️ Threshold Analysis")
+            layout = QVBoxLayout(tab_threshold)
+            
+            error_label = QLabel(f"Threshold Analysis feature not available: {e}")
+            error_label.setStyleSheet("color: red; padding: 20px; font-size: 12px;")
+            layout.addWidget(error_label)
     
-    def create_data_tab(self):
-        """Create data table tab"""
-        self.data_tab = QWidget()
-        layout = QVBoxLayout(self.data_tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-        
-        # Controls
-        controls_layout = QHBoxLayout()
-        
-        controls_layout.addWidget(QLabel("Show:"))
-        self.limit_combo = QComboBox()
-        self.limit_combo.addItems(["100", "500", "1000", "2000", "All"])
-        self.limit_combo.setCurrentText("1000")
-        controls_layout.addWidget(self.limit_combo)
-        
-        controls_layout.addWidget(QLabel("Parameter:"))
-        self.table_param_combo = QComboBox()
-        self.table_param_combo.addItem("All")
-        controls_layout.addWidget(self.table_param_combo)
-        
-        controls_layout.addStretch()
-        
-        export_btn = QPushButton("💾 Export CSV")
-        controls_layout.addWidget(export_btn)
-        
-        layout.addLayout(controls_layout)
-        
-        # Table info
-        self.table_info_label = QLabel("No data loaded")
-        layout.addWidget(self.table_info_label)
-        
-        # Data table
-        self.data_table = QTableWidget()
-        self.data_table.setAlternatingRowColors(True)
-        self.data_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.data_table.setSortingEnabled(True)
-        layout.addWidget(self.data_table)
-        
-        self.tab_widget.addTab(self.data_tab, "📋 Data Table")
+    
+    # Data table tab creation method removed for streamlined interface
     
     def create_fault_code_tab(self):
         """Create fault code lookup tab"""
