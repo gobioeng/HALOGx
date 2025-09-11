@@ -1,6 +1,6 @@
 """
 Gobioeng HALog 0.0.1 beta
-Professional LINAC Water System Monitor
+Professional LINAC Monitoring System
 Company: gobioeng.com
 Created: 2025-08-20 22:58:39 UTC
 Updated: 2025-08-27 15:08:00 UTC
@@ -136,7 +136,7 @@ def safe_execute_with_error_handling(func, error_message="Operation failed", *ar
 class HALogApp:
     """
     Gobioeng HALog Application with optimized startup
-    Professional LINAC Water System Monitor - gobioeng.com
+    Professional LINAC Monitoring System - gobioeng.com
     """
 
     def __init__(self):
@@ -1138,6 +1138,40 @@ class HALogApp:
                     import traceback
                     traceback.print_exc()
 
+            def refresh_threshold_analysis(self):
+                """Refresh threshold analysis widget with current data"""
+                try:
+                    # Check if threshold widget exists
+                    if not hasattr(self.ui, 'threshold_plot_widget'):
+                        print("⚠️ Threshold plot widget not available")
+                        return
+                    
+                    # Ensure we have data
+                    if not hasattr(self, 'df') or self.df.empty:
+                        print("⚠️ No data available for threshold analysis")
+                        return
+                        
+                    # Get parameter mapping from UnifiedParser
+                    parameter_mapping = None
+                    if hasattr(self, 'parser') and hasattr(self.parser, 'parameter_mapping'):
+                        parameter_mapping = self.parser.parameter_mapping
+                    
+                    # Set data in the threshold widget
+                    self.ui.threshold_plot_widget.set_data(self.df, parameter_mapping)
+                    
+                    # Auto-add some key parameters for initial display
+                    key_parameters = ['magnetronFlow', 'targetAndCirculatorFlow', 'magnetronTemp', 'targetAndCirculatorTemp']
+                    for param in key_parameters[:2]:  # Start with 2 parameters
+                        if param in self.df.columns:
+                            self.ui.threshold_plot_widget.add_parameter_with_thresholds(param)
+                            
+                    print("✅ Threshold analysis updated successfully")
+                    
+                except Exception as e:
+                    print(f"❌ Error refreshing threshold analysis: {e}")
+                    import traceback
+                    traceback.print_exc()
+
             def _get_parameter_data_by_description(self, parameter_description):
                 """Optimized parameter data retrieval with caching and minimal logging"""
                 try:
@@ -2048,6 +2082,13 @@ Source: {result.get('source', 'unknown')} database
                             self.refresh_trend_tab(group)
                         except Exception as e:
                             print(f"  Error refreshing {group} trends: {e}")
+
+                    # Refresh threshold analysis with all data
+                    try:
+                        print("  Refreshing threshold analysis...")
+                        self.refresh_threshold_analysis()
+                    except Exception as e:
+                        print(f"  Error refreshing threshold analysis: {e}")
 
                     print("✅ All trend graphs refreshed")
 
@@ -3929,7 +3970,7 @@ Source: {result.get('source', 'unknown')} database
             total_time = time.time() - startup_begin
             print(f"🚀 Gobioeng HALog startup: {total_time:.3f}s")
             print(f"   Developed by gobioeng.com")
-            print(f"   Professional LINAC Water System Monitor Complete")
+            print(f"   Professional LINAC Monitoring System Complete")
 
             # Run application
             sys.exit(app.exec_())

@@ -22,7 +22,7 @@ class HALbasicInstaller:
         self.app_name = "HALbasic"
         self.app_version = "0.0.1"
         self.company = "gobioeng.com"
-        self.description = "Professional LINAC Water System Monitor"
+        self.description = "Professional LINAC Monitoring System"
         
         # Paths
         self.project_root = Path(__file__).parent.resolve()
