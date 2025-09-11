@@ -12,18 +12,7 @@ CoolingcityWaterTempStatistics                   | City water flow		      |l/m
 CoolingtargetFlowLowStatistics			 | Target & Circulator Flow	      |l/m
 CoolingmagnetronFlowLowStatistics                | Magnetron Flow                     | L/min
 
-COL_ADC_CHAN_SRV_ENC_3_3V_MON_STAT               | Encoder 3.3V Supply                | V
-COL_ADC_CHAN_M48V_MON_STAT                       | Main -48V Supply                   | V
-COL_ADC_CHAN_M15V_MON_STAT                       | Main -15V Supply                   | V
-COL_ADC_CHAN_M11V_MON_STAT                       | Main -11V Supply                   | V
-COL_ADC_CHAN_24V_MON_STAT                        | Main 24V Supply                    | V
-COL_ADC_CHAN_5V_MON_STAT                         | Main 5V Supply                     | V
-COL_ADC_CHAN_3_3V_MON_STAT                       | Main 3.3V Supply                   | V
-COL_ADC_CHAN_1_2V_MON_STAT                       | Main 1.2V Supply                   | V
-COL_ADC_CHAN_5VA_MON_STAT                        | Analog 5V Supply                   | V
-COL_ADC_CHAN_VREF2500_MON_STAT                   | 2.5V Reference Voltage             | V
-COL_ADC_CHAN_VREF2V5_HI_MON_STAT                 | 2.5V Reference High                | V
-COL_ADC_CHAN_VREF2V5_LO_MON_STAT                 | 2.5V Reference Low                 | V
+
 MLC_ADC_CHAN_PROXIMAL_10V_BANKA_MON_STAT         | MLC Proximal 10V Bank A            | V
 MLC_ADC_CHAN_PROXIMAL_10V_BANKB_MON_STAT         | MLC Proximal 10V Bank B            | V
 MLC_ADC_CHAN_DISTAL_10V_BANKA_MON_STAT           | MLC Distal 10V Bank A              | V
@@ -38,10 +27,7 @@ MLC_ADC_CHAN_5V_BANKA_MON_STAT                   | MLC 5V Bank A                
 MLC_ADC_CHAN_5V_BANKB_MON_STAT                   | MLC 5V Bank B                      | V
 MLC_ADC_CHAN_P5VA_BANKA_MON_STAT                 | MLC +5V Analog Bank A              | V
 MLC_ADC_CHAN_P5VA_BANKB_MON_STAT                 | MLC +5V Analog Bank B              | V
-MLC_ADC_CHAN_3_3V_BANKA_MON_STAT                 | MLC 3.3V Bank A                    | V
-MLC_ADC_CHAN_3_3V_BANKB_MON_STAT                 | MLC 3.3V Bank B                    | V
-MLC_ADC_CHAN_1_2V_BANKA_MON_STAT                 | MLC 1.2V Bank A                    | V
-MLC_ADC_CHAN_1_2V_BANKB_MON_STAT                 | MLC 1.2V Bank B                    | V
+
 MLC_ADC_CHAN_TEMP_BANKA_STAT                     | MLC Temperature Bank A             | °C
 MLC_ADC_CHAN_TEMP_BANKB_STAT                     | MLC Temperature Bank B             | °C
 MLC_ADC_CHAN_M48V_BANKA_MON_STAT                 | MLC -48V Bank A                    | V
@@ -75,31 +61,7 @@ NDCIndexMotor::GantryRtn primDriftStats       		   | Gantry Primary Drift       
 NDCIndexMotor::GantryRtn secDriftStats          	   | Gantry Secondary Drift             | mm
 NDCIndexMotor::CollRtn primDriftStats           	   | Collimator Primary Drift           | mm
 NDCIndexMotor::CollRtn secDriftStats            	   | Collimator Secondary Drift         | mm
-MLCController::logStatistics LeafA0_primSecDevStats 	| Leaf A0 Primary/Secondary Deviation | mm
-MLCController::logStatistics LeafB0_primSecDevStats 	| Leaf B0 Primary/Secondary Deviation | mm
-MLCController::logStatistics LeafA0_primDriftStats 	| Leaf A0 Primary Drift              | mm
-MLCController::logStatistics LeafB0_primDriftStats 	| Leaf B0 Primary Drift              | mm
-MLCController::logStatistics LeafA1_primSecDevStats 	| Leaf A1 Primary/Secondary Deviation | mm
-MLCController::logStatistics LeafB1_primSecDevStats 	| Leaf B1 Primary/Secondary Deviation | mm
-MLCController::logStatistics LeafA1_primDriftStats 	| Leaf A1 Primary Drift              | mm
-MLCController::logStatistics LeafB1_primDriftStats	 | Leaf B1 Primary Drift              | mm
-MLCController::logStatistics LeafA2_primSecDevStats 	| Leaf A2 Primary/Secondary Deviation | mm
-MLCController::logStatistics LeafB2_primSecDevStats 	| Leaf B2 Primary/Secondary Deviation | mm
-MLCController::logStatistics LeafA2_primDriftStats 	| Leaf A2 Primary Drift              | mm
-MLCController::logStatistics LeafB2_primDriftStats 	| Leaf B2 Primary Drift              | mm
-MLCController::logStatistics LeafA3_primSecDevStats 	| Leaf A3 Primary/Secondary Deviation | mm
-MLCController::logStatistics LeafB3_primSecDevStats	 | Leaf B3 Primary/Secondary Deviation | mm
-MLCController::logStatistics LeafA3_primDriftStats 	| Leaf A3 Primary Drift              | mm
-MLCController::logStatistics LeafB3_primDriftStats 	| Leaf B3 Primary Drift              | mm
-MLCController::logStatistics LeafA4_primSecDevStats 	| Leaf A4 Primary/Secondary Deviation | mm
-MLCController::logStatistics LeafB4_primSecDevStats 	| Leaf B4 Primary/Secondary Deviation | mm
-MLCController::logStatistics LeafA4_primDriftStats 	| Leaf A4 Primary Drift              | mm
-MLCController::logStatistics LeafB4_primDriftStats 	| Leaf B4 Primary Drift              | mm
-MLCController::logStatistics LeafA5_primSecDevStats 	| Leaf A5 Primary/Secondary Deviation | mm
-MLCController::logStatistics LeafB5_primSecDevStats 	| Leaf B5 Primary/Secondary Deviation | mm
-MLCController::logStatistics LeafA5_primDriftStats 	| Leaf A5 Primary Drift              | mm
-MLCController::logStatistics LeafB5_primDriftStats 	| Leaf B5 Primary Drift              | mm
-... (continues for all leaves up to 56)
+
 NDCMotor::AFCMotor primDevStats             	     | AFC Motor Primary Deviation        | mm
 NDCMotor::AFCMotor secDevStats              	     | AFC Motor Secondary Deviation      | mm
 
