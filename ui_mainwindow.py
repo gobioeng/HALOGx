@@ -31,12 +31,7 @@ class Ui_MainWindow:
         self.trend_sub_tabs = None
         self.chart_widgets = {}
         
-        # Data table components
-        self.data_tab = None
-        self.data_table = None
-        self.table_info_label = None
-        self.limit_combo = None
-        self.table_param_combo = None
+        # Data table components - REMOVED
         
         # Fault code components
         self.fault_tab = None
@@ -181,8 +176,7 @@ class Ui_MainWindow:
         # Trends tab with sub-tabs
         self.create_trends_tab()
         
-        # Data table tab
-        self.create_data_tab()
+        # Data table tab - REMOVED for streamlined interface
         
         # Fault Code tab
         self.create_fault_code_tab()
@@ -398,45 +392,7 @@ class Ui_MainWindow:
         chart_placeholder.setStyleSheet("border: 1px solid #ccc; background: #f9f9f9;")
         layout.addWidget(chart_placeholder)
     
-    def create_data_tab(self):
-        """Create data table tab"""
-        self.data_tab = QWidget()
-        layout = QVBoxLayout(self.data_tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-        
-        # Controls
-        controls_layout = QHBoxLayout()
-        
-        controls_layout.addWidget(QLabel("Show:"))
-        self.limit_combo = QComboBox()
-        self.limit_combo.addItems(["100", "500", "1000", "2000", "All"])
-        self.limit_combo.setCurrentText("1000")
-        controls_layout.addWidget(self.limit_combo)
-        
-        controls_layout.addWidget(QLabel("Parameter:"))
-        self.table_param_combo = QComboBox()
-        self.table_param_combo.addItem("All")
-        controls_layout.addWidget(self.table_param_combo)
-        
-        controls_layout.addStretch()
-        
-        export_btn = QPushButton("💾 Export CSV")
-        controls_layout.addWidget(export_btn)
-        
-        layout.addLayout(controls_layout)
-        
-        # Table info
-        self.table_info_label = QLabel("No data loaded")
-        layout.addWidget(self.table_info_label)
-        
-        # Data table
-        self.data_table = QTableWidget()
-        self.data_table.setAlternatingRowColors(True)
-        self.data_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.data_table.setSortingEnabled(True)
-        layout.addWidget(self.data_table)
-        
-        self.tab_widget.addTab(self.data_tab, "📋 Data Table")
+    # Data table tab creation method removed for streamlined interface
     
     def create_fault_code_tab(self):
         """Create fault code lookup tab"""

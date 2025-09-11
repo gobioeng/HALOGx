@@ -768,13 +768,7 @@ class HALogApp:
                         self.ui.comboFanBottomGraph.currentIndexChanged.connect(lambda: self.refresh_trend_tab('fan_speed'))
                     print("✓ Trend dropdown change events connected")
 
-                    # MPC TAB ACTIONS - Single date selection
-                    if hasattr(self.ui, 'btnRefreshMPC'):
-                        self.ui.btnRefreshMPC.clicked.connect(self.refresh_latest_mpc)
-
-                        # Connect MPC date selection dropdown
-                        if hasattr(self.ui, 'comboMPCDate'):
-                            self.ui.comboMPCDate.currentIndexChanged.connect(self.refresh_latest_mpc)
+                    # MPC TAB ACTIONS - REMOVED for streamlined interface
 
                     # ANALYSIS TAB ACTIONS - Enhanced controls
                     if hasattr(self.ui, 'btnRefreshAnalysis'):
@@ -1517,10 +1511,8 @@ class HALogApp:
                     print(f"Error updating MPC statistics: {e}")
 
             def compare_mpc_results(self):
-                """Legacy function - kept for backward compatibility"""
-                # This function is no longer needed but kept to avoid errors
-                print("⚠️ MPC comparison function deprecated - using latest MPC data display instead")
-                self.refresh_latest_mpc()
+                """Legacy function - removed for streamlined interface"""
+                print("⚠️ MPC functionality removed for streamlined interface")
 
             def search_fault_code(self):
                 """Search for fault code by code number"""
@@ -2001,7 +1993,7 @@ Source: {result.get('source', 'unknown')} database
                     # Initialize trend graphs with default parameters only if we have data
                     if not self.df.empty:
                         QtCore.QTimer.singleShot(300, self._refresh_all_trends)
-                        QtCore.QTimer.singleShot(200, self.refresh_latest_mpc)
+                        # MPC tab initialization removed
 
                 except Exception as e:
                     print(f"Error loading dashboard: {e}")
@@ -2316,7 +2308,7 @@ Source: {result.get('source', 'unknown')} database
                             )
                             progress_dialog.setWindowModality(QtCore.Qt.WindowModal)
                             progress_dialog.setMinimumDuration(0)
-                            progress_dialog.setValue(0)
+                            self.progress_dialog.setValue(0)
                             progress_dialog.show()
 
                             analyzer = DataAnalyzer()
@@ -2329,7 +2321,7 @@ Source: {result.get('source', 'unknown')} database
                             self._active_analysis_workers.append(worker)
 
                             worker.analysis_progress.connect(
-                                lambda p, m: progress_dialog.setValue(p)
+                                lambda p, m: self.progress_dialog.setValue(p)
                             )
                             worker.analysis_finished.connect(
                                 lambda results: self._display_analysis_results(
@@ -2416,8 +2408,8 @@ Source: {result.get('source', 'unknown')} database
                 """Display analysis results after worker completes"""
                 try:
                     if progress_dialog:
-                        progress_dialog.setValue(100)
-                        progress_dialog.close()
+                        self.progress_dialog.setValue(100)
+                        self.progress_dialog.close()
 
                     if "trends" in results:
                         self._populate_trends_table(results["trends"])
@@ -2428,7 +2420,7 @@ Source: {result.get('source', 'unknown')} database
                 """Handle analysis errors from worker thread"""
                 try:
                     if progress_dialog:
-                        progress_dialog.close()
+                        self.progress_dialog.close()
 
                     QtWidgets.QMessageBox.warning(
                         self,
@@ -2668,9 +2660,9 @@ Source: {result.get('source', 'unknown')} database
                         if index == 1:  # Trends tab
                             self.update_trend()
                             tab_data = {"type": "trend", "updated_at": current_time}
-                        elif index == 2:  # Data Table tab
-                    # Data table removed - skip update
-                            tab_data = {"type": "data_table", "updated_at": current_time}
+                        elif index == 2:  # Data Table tab - REMOVED
+                            # Data table removed - skip update
+                            tab_data = {"type": "removed_data_table", "updated_at": current_time}
                         elif index == 3:  # Analysis tab
                             self.update_analysis_tab()
                             tab_data = {"type": "analysis", "updated_at": current_time}
@@ -2928,15 +2920,14 @@ Source: {result.get('source', 'unknown')} database
                         # Initialize default trend displays
                         QtCore.QTimer.singleShot(500, self._refresh_all_trends)
 
-                        # Initialize MPC tab with new data
-                        QtCore.QTimer.singleShot(300, self.refresh_latest_mpc)
+                        # MPC tab initialization removed
 
                         # Mark as complete and keep progress dialog until user sees success message
                         self.progress_dialog.mark_complete()
                         QtCore.QTimer.singleShot(100, self._show_success_message_and_close_progress)
                         return
                     else:
-                        self.progress_dialog.close()
+                        self.self.progress_dialog.close()
                         QtWidgets.QMessageBox.warning(
                             self,
                             "Import Warning",
@@ -2947,7 +2938,7 @@ Source: {result.get('source', 'unknown')} database
                 except Exception as e:
                     # Close progress dialog if it exists
                     if hasattr(self, 'progress_dialog') and self.progress_dialog:
-                        self.progress_dialog.close()
+                        self.self.progress_dialog.close()
                     
                     print(f"Error in import_log_file: {e}")
                     traceback.print_exc()
@@ -2959,7 +2950,7 @@ Source: {result.get('source', 'unknown')} database
                 """Show success message and close progress dialog"""
                 try:
                     if hasattr(self, 'progress_dialog') and self.progress_dialog:
-                        self.progress_dialog.close()
+                        self.self.progress_dialog.close()
                     
                     # Get the latest data for success message
                     total_records = len(self.df) if hasattr(self, 'df') and not self.df.empty else 0
@@ -3032,7 +3023,7 @@ Source: {result.get('source', 'unknown')} database
                     print(f"Batch insert completed: {records_inserted} records in {duration:.2f}s ({records_per_sec:.1f} records/sec)")
                     
                     # Insert file metadata
-                    progress_dialog.update_progress(95, "Saving metadata...")
+                    self.progress_dialog.update_progress(95, "Saving metadata...")
                     QtWidgets.QApplication.processEvents()
                     
                     filename = os.path.basename(file_path)
@@ -3044,9 +3035,9 @@ Source: {result.get('source', 'unknown')} database
                         parsing_stats=parsing_stats_json,
                     )
                     
-                    progress_dialog.mark_complete()
+                    self.progress_dialog.mark_complete()
                     QtWidgets.QApplication.processEvents()
-                    progress_dialog.close()
+                    self.self.progress_dialog.close()
                     
                     return records_inserted
                     
@@ -3097,7 +3088,7 @@ Source: {result.get('source', 'unknown')} database
                     )
 
                     self.progress_dialog.mark_complete()
-                    self.progress_dialog.close()
+                    self.self.progress_dialog.close()
 
                     try:
                         self.df = self.db.get_all_logs(chunk_size=10000)
@@ -3117,8 +3108,7 @@ Source: {result.get('source', 'unknown')} database
                     # Initialize default trend displays
                     QtCore.QTimer.singleShot(500, self._refresh_all_trends)
 
-                    # Initialize MPC tab with new data
-                    QtCore.QTimer.singleShot(300, self.refresh_latest_mpc)
+                    # MPC tab initialization removed
 
                     # Show success message only once
                     if not hasattr(self, '_import_success_shown'):
@@ -3260,7 +3250,6 @@ Source: {result.get('source', 'unknown')} database
                                 f"Data is now available in:\n"
                                 f"• Dashboard tab (system status)\n"
                                 f"• Trend tab graphs\n"
-                                f"• Data Table tab\n"
                                 f"• Analysis tab statistics"
                             )
                         else:
@@ -3308,7 +3297,7 @@ Source: {result.get('source', 'unknown')} database
                             if 'tb' in line_lower or 'halfault' in line_lower or 'hal fault' in line_lower:
                                 filtered_lines.append(line)
 
-                    progress_dialog.setValue(30)
+                    self.self.progress_dialog.setValue(30)
                     QtWidgets.QApplication.processEvents()
 
                     print(f"Filtered {len(filtered_lines)} relevant lines from file")
@@ -3320,7 +3309,7 @@ Source: {result.get('source', 'unknown')} database
                             temp_file.writelines(filtered_lines)
                             temp_path = temp_file.name
 
-                        progress_dialog.setValue(50)
+                        self.progress_dialog.setValue(50)
                         QtWidgets.QApplication.processEvents()
 
                         # Parse the filtered data
@@ -3328,120 +3317,16 @@ Source: {result.get('source', 'unknown')} database
                         parser = UnifiedParser()
                         df = parser.parse_linac_file(temp_path)
 
-                        progress_dialog.setValue(70)
+                        self.progress_dialog.setValue(70)
                         QtWidgets.QApplication.processEvents()
 
                         # Insert only the filtered data
                         records_inserted = self.db.insert_data_batch(df)
 
-                        progress_dialog.setValue(90)
+                        self.progress_dialog.setValue(90)
                         QtWidgets.QApplication.processEvents()
 
                         # Clean up temporary file
-                        os.unlink(temp_path)
-
-                        # Store metadata
-                        filename = os.path.basename(file_path) + " (TB/HALfault filtered)"
-                        parsing_stats_json = f'{{"filtered_lines": {len(filtered_lines)}, "total_records": {records_inserted}}}'
-
-                        self.db.insert_file_metadata(
-                            filename=filename,
-                            file_size=len(''.join(filtered_lines)),
-                            records_imported=records_inserted,
-                            parsing_stats=parsing_stats_json,
-                        )
-
-                        progress_dialog.setValue(100)
-                        progress_dialog.close()
-
-                        # Refresh data
-                        try:
-                            self.df = self.db.get_all_logs(chunk_size=10000)
-                        except TypeError:
-                            self.df = self.db.get_all_logs()
-                        self.load_dashboard()
-
-                        QtWidgets.QMessageBox.information(
-                            self,
-                            "Import Successful",
-                            f"Successfully imported {records_inserted:,} filtered records (TB/HALfault only).",
-                        )
-                    else:
-                        progress_dialog.close()
-                        QtWidgets.QMessageBox.information(
-                            self,
-                            "No Relevant Data",
-                            "No TB or HALfault entries found in the selected file.",
-                        )
-
-                except Exception as e:
-                    QtWidgets.QMessageBox.critical(
-                        self, "Processing Error", f"An error occurred: {str(e)}"
-                    )
-                    traceback.print_exc()
-
-            def _import_large_file_filtered(self, file_path, file_size):
-                """Import large log file with TB/HALfault filtering"""
-                try:
-                    from progress_dialog import ProgressDialog
-
-                    self.progress_dialog = ProgressDialog(self)
-                    self.progress_dialog.setWindowTitle("Processing Large Filtered Log File")
-                    self.progress_dialog.show()
-                    self.progress_dialog.set_phase("uploading", 0)
-                    QtWidgets.QApplication.processEvents()
-
-                    # Process file in chunks for large files
-                    chunk_size = 1024 * 1024  # 1MB chunks
-                    filtered_lines = []
-                    processed_bytes = 0
-
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        while True:
-                            chunk = f.read(chunk_size)
-                            if not chunk:
-                                break
-
-                            processed_bytes += len(chunk.encode('utf-8'))
-                            progress = min(50, int((processed_bytes / file_size) * 50))
-                            self.progress_dialog.setValue(progress)
-                            QtWidgets.QApplication.processEvents()
-
-                            if self.progress_dialog.wasCanceled():
-                                return
-
-                            # Filter lines in chunk
-                            lines = chunk.split('\n')
-                            for line in lines:
-                                line_lower = line.lower()
-                                if 'tb' in line_lower or 'halfault' in line_lower or 'hal fault' in line_lower:
-                                    filtered_lines.append(line + '\n')
-
-                    print(f"Filtered {len(filtered_lines)} relevant lines from large file")
-                    self.progress_dialog.setValue(60)
-                    QtWidgets.QApplication.processEvents()
-
-                    if filtered_lines:
-                        # Process filtered data
-                        import tempfile
-                        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
-                            temp_file.writelines(filtered_lines)
-                            temp_path = temp_file.name
-
-                        self.progress_dialog.setValue(70)
-                        QtWidgets.QApplication.processEvents()
-
-                        # Use existing large file processing for filtered data
-                        from unified_parser import UnifiedParser
-                        parser = UnifiedParser()
-                        df = parser.parse_linac_file(temp_path)
-
-                        self.progress_dialog.setValue(85)
-                        QtWidgets.QApplication.processEvents()
-
-                        records_inserted = self.db.insert_data_batch(df)
-
-                        # Clean up
                         os.unlink(temp_path)
 
                         # Store metadata
@@ -3484,6 +3369,110 @@ Source: {result.get('source', 'unknown')} database
                     )
                     traceback.print_exc()
 
+            def _import_large_file_filtered(self, file_path, file_size):
+                """Import large log file with TB/HALfault filtering"""
+                try:
+                    from progress_dialog import ProgressDialog
+
+                    self.progress_dialog = ProgressDialog(self)
+                    self.progress_dialog.setWindowTitle("Processing Large Filtered Log File")
+                    self.progress_dialog.show()
+                    self.progress_dialog.set_phase("uploading", 0)
+                    QtWidgets.QApplication.processEvents()
+
+                    # Process file in chunks for large files
+                    chunk_size = 1024 * 1024  # 1MB chunks
+                    filtered_lines = []
+                    processed_bytes = 0
+
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        while True:
+                            chunk = f.read(chunk_size)
+                            if not chunk:
+                                break
+
+                            processed_bytes += len(chunk.encode('utf-8'))
+                            progress = min(50, int((processed_bytes / file_size) * 50))
+                            self.self.progress_dialog.setValue(progress)
+                            QtWidgets.QApplication.processEvents()
+
+                            if self.progress_dialog.wasCanceled():
+                                return
+
+                            # Filter lines in chunk
+                            lines = chunk.split('\n')
+                            for line in lines:
+                                line_lower = line.lower()
+                                if 'tb' in line_lower or 'halfault' in line_lower or 'hal fault' in line_lower:
+                                    filtered_lines.append(line + '\n')
+
+                    print(f"Filtered {len(filtered_lines)} relevant lines from large file")
+                    self.self.progress_dialog.setValue(60)
+                    QtWidgets.QApplication.processEvents()
+
+                    if filtered_lines:
+                        # Process filtered data
+                        import tempfile
+                        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
+                            temp_file.writelines(filtered_lines)
+                            temp_path = temp_file.name
+
+                        self.self.progress_dialog.setValue(70)
+                        QtWidgets.QApplication.processEvents()
+
+                        # Use existing large file processing for filtered data
+                        from unified_parser import UnifiedParser
+                        parser = UnifiedParser()
+                        df = parser.parse_linac_file(temp_path)
+
+                        self.self.progress_dialog.setValue(85)
+                        QtWidgets.QApplication.processEvents()
+
+                        records_inserted = self.db.insert_data_batch(df)
+
+                        # Clean up
+                        os.unlink(temp_path)
+
+                        # Store metadata
+                        filename = os.path.basename(file_path) + " (TB/HALfault filtered)"
+                        parsing_stats_json = f'{{"filtered_lines": {len(filtered_lines)}, "total_records": {records_inserted}}}'
+
+                        self.db.insert_file_metadata(
+                            filename=filename,
+                            file_size=len(''.join(filtered_lines)),
+                            records_imported=records_inserted,
+                            parsing_stats=parsing_stats_json,
+                        )
+
+                        self.self.progress_dialog.setValue(100)
+                        self.self.progress_dialog.close()
+
+                        # Refresh data
+                        try:
+                            self.df = self.db.get_all_logs(chunk_size=10000)
+                        except TypeError:
+                            self.df = self.db.get_all_logs()
+                        self.load_dashboard()
+
+                        QtWidgets.QMessageBox.information(
+                            self,
+                            "Import Successful",
+                            f"Successfully imported {records_inserted:,} filtered records (TB/HALfault only).",
+                        )
+                    else:
+                        self.self.progress_dialog.close()
+                        QtWidgets.QMessageBox.information(
+                            self,
+                            "No Relevant Data",
+                            "No TB or HALfault entries found in the selected file.",
+                        )
+
+                except Exception as e:
+                    QtWidgets.QMessageBox.critical(
+                        self, "Processing Error", f"An error occurred: {str(e)}"
+                    )
+                    traceback.print_exc()
+
             def clear_database(self):
                 """Clear database with professional confirmation"""
                 try:
@@ -3501,26 +3490,26 @@ Source: {result.get('source', 'unknown')} database
                         )
                         progress_dialog.setWindowModality(QtCore.Qt.WindowModal)
                         progress_dialog.setCancelButton(None)
-                        progress_dialog.setValue(10)
+                        self.progress_dialog.setValue(10)
                         progress_dialog.show()
                         QtWidgets.QApplication.processEvents()
 
                         self.db.clear_all()
 
-                        progress_dialog.setValue(50)
+                        self.progress_dialog.setValue(50)
                         QtWidgets.QApplication.processEvents()
 
                         import pandas as pd
 
                         self.df = pd.DataFrame()
 
-                        progress_dialog.setValue(70)
+                        self.progress_dialog.setValue(70)
                         QtWidgets.QApplication.processEvents()
 
                         self.load_dashboard()
 
-                        progress_dialog.setValue(100)
-                        progress_dialog.close()
+                        self.progress_dialog.setValue(100)
+                        self.progress_dialog.close()
 
                         QtWidgets.QMessageBox.information(
                             self, "Database", "Data cleared successfully."
@@ -3541,7 +3530,7 @@ Source: {result.get('source', 'unknown')} database
                     # Mark progress dialog as complete and close it
                     if hasattr(self, "progress_dialog") and self.progress_dialog:
                         self.progress_dialog.mark_complete()
-                        self.progress_dialog.close()
+                        self.self.progress_dialog.close()
                         self.progress_dialog = None
 
                     print(f"🎯 File processing finished: {records_count} records inserted")
@@ -3580,8 +3569,7 @@ Source: {result.get('source', 'unknown')} database
                         # Initialize default trend displays
                         QtCore.QTimer.singleShot(500, self._refresh_all_trends)
 
-                        # Initialize MPC tab with new data
-                        QtCore.QTimer.singleShot(300, self.refresh_latest_mpc)
+                        # MPC tab initialization removed
 
                         QtWidgets.QMessageBox.information(
                             self,
@@ -3616,7 +3604,7 @@ Source: {result.get('source', 'unknown')} database
                 """Handle errors during file processing"""
                 try:
                     if hasattr(self, "progress_dialog") and self.progress_dialog:
-                        self.progress_dialog.close()
+                        self.self.progress_dialog.close()
 
                     QtWidgets.QMessageBox.critical(
                         self, "Processing Error", f"An error occurred: {error_message}"
