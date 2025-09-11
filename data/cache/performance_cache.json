@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "created_at": "2025-09-11T11:08:05.265263",
+  "processed_data": {
+    "checksum": "65c50c43d2473ac27d47ed2f80930b47623a350cd915b317d08f021160aab774",
+    "results": {
+      "dashboard_loaded": true,
+      "data_summary": {
+        "total_records": 9588,
+        "unique_parameters": 13,
+        "unique_serials": 2,
+        "date_range": [
+          "2025-07-11 00:06:26",
+          "2025-08-21 23:27:21"
+        ],
+        "quality_distribution": [
+          {
+            "data_quality": null,
+            "count": 9588
+          }
+        ]
+      },
+      "cached_at": 1757585285.2464807
+    },
+    "processed_at": "2025-09-11T11:08:05.265263"
+  },
+  "tab_cache": {
+    "tab_1": {
+      "data": {
+        "type": "trend",
+        "updated_at": 1757585289.1480904
+      },
+      "cached_at": "2025-09-11T11:08:12.928711",
+      "cache_key": "a33cd04a45fb989c"
+    }
+  },
+  "last_optimization": null,
+  "last_updated": "2025-09-11T11:08:12.928711"
+}

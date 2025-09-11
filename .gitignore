@@ -1,0 +1,41 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database files (will be managed in /data folder)
+*.db
+*.sqlite
+*.sqlite3
+
+# PyQt cache
+*.qmlc
+*.jsc
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Virtual environment
+venv/
+env/
+.env
