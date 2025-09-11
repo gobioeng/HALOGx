@@ -813,6 +813,295 @@ PlotWidget = EnhancedPlotWidget
 DualPlotWidget = EnhancedDualPlotWidget
 
 
+class ThresholdPlotWidget(EnhancedPlotWidget):
+    """Advanced threshold visualization widget with min/max boundaries and alert zones"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.thresholds = {}  # Store threshold data per parameter
+        self.alert_zones = {}  # Store alert zone configurations
+        
+    def set_parameter_thresholds(self, parameter: str, min_threshold: float = None, 
+                                max_threshold: float = None, warning_min: float = None, 
+                                warning_max: float = None):
+        """Set threshold boundaries for a parameter"""
+        self.thresholds[parameter] = {
+            'min': min_threshold,
+            'max': max_threshold, 
+            'warning_min': warning_min,
+            'warning_max': warning_max
+        }
+        
+    def plot_parameter_with_thresholds(self, data: pd.DataFrame, parameter: str, 
+                                     title: str = "", auto_detect_thresholds: bool = True):
+        """Plot parameter with threshold boundaries and alert zones"""
+        try:
+            if data.empty or self.figure is None:
+                return
+                
+            self.figure.clear()
+            ax = self.figure.add_subplot(111)
+            
+            # Filter data for the parameter
+            if 'param' in data.columns:
+                param_data = data[data['param'] == parameter].copy()
+            else:
+                param_data = data.copy()
+                
+            if param_data.empty:
+                ax.text(0.5, 0.5, f'No data available for {parameter}', 
+                       ha='center', va='center', transform=ax.transAxes, fontsize=12)
+                self.canvas.draw()
+                return
+                
+            # Sort by datetime for proper line plotting
+            param_data = param_data.sort_values('datetime')
+            
+            # Auto-detect thresholds if enabled and not manually set
+            if auto_detect_thresholds and parameter not in self.thresholds:
+                self._auto_detect_thresholds(param_data, parameter)
+                
+            # Plot the main parameter line
+            x_data = param_data['datetime']
+            y_data = param_data['avg'] if 'avg' in param_data.columns else param_data['average']
+            
+            # Color-code the line based on threshold status
+            self._plot_threshold_colored_line(ax, x_data, y_data, parameter)
+            
+            # Add threshold bands and lines
+            self._add_threshold_visualization(ax, x_data, parameter)
+            
+            # Add statistical bounds if available
+            if 'min' in param_data.columns and 'max' in param_data.columns:
+                ax.fill_between(x_data, param_data['min'], param_data['max'], 
+                              alpha=0.1, color='blue', label='Min/Max Range')
+                              
+            # Configure the plot
+            ax.set_title(f'{title}\nThreshold Monitoring: {parameter}', fontweight='bold', fontsize=12)
+            ax.set_xlabel('Time', fontweight='bold')
+            ax.set_ylabel('Value', fontweight='bold')
+            ax.grid(True, alpha=0.3)
+            ax.legend(loc='upper right', framealpha=0.9)
+            
+            # Format time axis
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
+            self.figure.autofmt_xdate()
+            
+            # Add alert zone indicators
+            self._add_alert_indicators(ax, param_data, parameter)
+            
+            self.figure.tight_layout()
+            self.canvas.draw()
+            
+            # Add interactive capabilities
+            if hasattr(self, 'interactive_manager'):
+                self.interactive_manager = InteractivePlotManager(self.figure, ax, self.canvas)
+                
+        except Exception as e:
+            print(f"Error plotting threshold visualization: {e}")
+            
+    def _auto_detect_thresholds(self, param_data: pd.DataFrame, parameter: str):
+        """Automatically detect reasonable threshold values based on data statistics"""
+        try:
+            values = param_data['avg'] if 'avg' in param_data.columns else param_data['average']
+            
+            # Statistical analysis for threshold detection
+            mean_val = values.mean()
+            std_val = values.std()
+            median_val = values.median()
+            q1 = values.quantile(0.25)
+            q3 = values.quantile(0.75)
+            iqr = q3 - q1
+            
+            # Use interquartile range method for robust threshold detection
+            warning_min = q1 - (1.5 * iqr)
+            warning_max = q3 + (1.5 * iqr)
+            critical_min = q1 - (3 * iqr)  
+            critical_max = q3 + (3 * iqr)
+            
+            # Ensure thresholds make sense (don't allow negative for certain parameters)
+            if any(keyword in parameter.lower() for keyword in ['temp', 'flow', 'speed', 'voltage']):
+                critical_min = max(0, critical_min)
+                warning_min = max(0, warning_min)
+                
+            self.set_parameter_thresholds(
+                parameter,
+                min_threshold=critical_min,
+                max_threshold=critical_max,
+                warning_min=warning_min,
+                warning_max=warning_max
+            )
+            
+        except Exception as e:
+            print(f"Error auto-detecting thresholds: {e}")
+            
+    def _plot_threshold_colored_line(self, ax, x_data, y_data, parameter: str):
+        """Plot line with colors based on threshold status"""
+        try:
+            thresholds = self.thresholds.get(parameter, {})
+            
+            if not thresholds or all(v is None for v in thresholds.values()):
+                # No thresholds defined, plot normal line
+                ax.plot(x_data, y_data, linewidth=2, alpha=0.8, label=parameter)
+                return
+                
+            # Create segments based on threshold status
+            segments = []
+            colors = []
+            
+            for i in range(len(y_data)):
+                value = y_data.iloc[i]
+                color = self._get_threshold_color(value, thresholds)
+                
+                if i == 0:
+                    segments.append(([x_data.iloc[i]], [value]))
+                    colors.append(color)
+                else:
+                    # Extend current segment or start new one
+                    if colors[-1] == color:
+                        segments[-1][0].append(x_data.iloc[i])
+                        segments[-1][1].append(value)
+                    else:
+                        segments.append(([x_data.iloc[i-1], x_data.iloc[i]], [y_data.iloc[i-1], value]))
+                        colors.append(color)
+                        
+            # Plot each segment with its color
+            for segment, color in zip(segments, colors):
+                if len(segment[0]) > 1:
+                    ax.plot(segment[0], segment[1], color=color, linewidth=2, alpha=0.8)
+                    
+            # Add legend for threshold status
+            ax.plot([], [], color='green', linewidth=2, label='Normal')
+            ax.plot([], [], color='orange', linewidth=2, label='Warning')
+            ax.plot([], [], color='red', linewidth=2, label='Critical')
+            
+        except Exception as e:
+            print(f"Error plotting threshold-colored line: {e}")
+            # Fallback to simple line
+            ax.plot(x_data, y_data, linewidth=2, alpha=0.8, label=parameter)
+            
+    def _get_threshold_color(self, value: float, thresholds: dict) -> str:
+        """Determine color based on threshold status"""
+        warning_min = thresholds.get('warning_min')
+        warning_max = thresholds.get('warning_max')
+        critical_min = thresholds.get('min')
+        critical_max = thresholds.get('max')
+        
+        # Check critical thresholds first
+        if critical_min is not None and value < critical_min:
+            return 'red'
+        if critical_max is not None and value > critical_max:
+            return 'red'
+            
+        # Check warning thresholds
+        if warning_min is not None and value < warning_min:
+            return 'orange'
+        if warning_max is not None and value > warning_max:
+            return 'orange'
+            
+        return 'green'  # Normal range
+        
+    def _add_threshold_visualization(self, ax, x_data, parameter: str):
+        """Add threshold lines and bands to the plot"""
+        try:
+            thresholds = self.thresholds.get(parameter, {})
+            if not thresholds:
+                return
+                
+            x_min, x_max = ax.get_xlim() if hasattr(ax, 'get_xlim') else (x_data.min(), x_data.max())
+            
+            # Add critical threshold lines
+            if thresholds.get('min') is not None:
+                ax.axhline(y=thresholds['min'], color='red', linestyle='--', linewidth=2, 
+                          alpha=0.7, label='Critical Min')
+            if thresholds.get('max') is not None:
+                ax.axhline(y=thresholds['max'], color='red', linestyle='--', linewidth=2, 
+                          alpha=0.7, label='Critical Max')
+                          
+            # Add warning threshold lines
+            if thresholds.get('warning_min') is not None:
+                ax.axhline(y=thresholds['warning_min'], color='orange', linestyle=':', linewidth=1.5, 
+                          alpha=0.7, label='Warning Min')
+            if thresholds.get('warning_max') is not None:
+                ax.axhline(y=thresholds['warning_max'], color='orange', linestyle=':', linewidth=1.5, 
+                          alpha=0.7, label='Warning Max')
+                          
+            # Add threshold bands
+            if thresholds.get('warning_min') is not None and thresholds.get('min') is not None:
+                ax.fill_between([x_min, x_max], [thresholds['min']] * 2, [thresholds['warning_min']] * 2,
+                              alpha=0.1, color='red', label='Critical Zone (Low)')
+                              
+            if thresholds.get('warning_max') is not None and thresholds.get('max') is not None:
+                ax.fill_between([x_min, x_max], [thresholds['warning_max']] * 2, [thresholds['max']] * 2,
+                              alpha=0.1, color='red', label='Critical Zone (High)')
+                              
+            # Add normal operating band
+            if thresholds.get('warning_min') is not None and thresholds.get('warning_max') is not None:
+                ax.fill_between([x_min, x_max], [thresholds['warning_min']] * 2, [thresholds['warning_max']] * 2,
+                              alpha=0.05, color='green', label='Normal Operating Range')
+                              
+        except Exception as e:
+            print(f"Error adding threshold visualization: {e}")
+            
+    def _add_alert_indicators(self, ax, param_data: pd.DataFrame, parameter: str):
+        """Add visual alert indicators for threshold violations"""
+        try:
+            thresholds = self.thresholds.get(parameter, {})
+            if not thresholds:
+                return
+                
+            y_data = param_data['avg'] if 'avg' in param_data.columns else param_data['average']
+            x_data = param_data['datetime']
+            
+            # Find threshold violations
+            violations = []
+            for i, (x, y) in enumerate(zip(x_data, y_data)):
+                violation_type = None
+                
+                # Check for critical violations
+                if (thresholds.get('min') is not None and y < thresholds['min']) or \
+                   (thresholds.get('max') is not None and y > thresholds['max']):
+                    violation_type = 'critical'
+                # Check for warning violations
+                elif (thresholds.get('warning_min') is not None and y < thresholds['warning_min']) or \
+                     (thresholds.get('warning_max') is not None and y > thresholds['warning_max']):
+                    violation_type = 'warning'
+                    
+                if violation_type:
+                    violations.append((x, y, violation_type))
+                    
+            # Plot violation markers
+            if violations:
+                critical_x = [v[0] for v in violations if v[2] == 'critical']
+                critical_y = [v[1] for v in violations if v[2] == 'critical']
+                warning_x = [v[0] for v in violations if v[2] == 'warning']
+                warning_y = [v[1] for v in violations if v[2] == 'warning']
+                
+                if critical_x:
+                    ax.scatter(critical_x, critical_y, color='red', s=50, marker='X', 
+                             alpha=0.8, label='Critical Alerts', zorder=5)
+                if warning_x:
+                    ax.scatter(warning_x, warning_y, color='orange', s=30, marker='!', 
+                             alpha=0.8, label='Warning Alerts', zorder=5)
+                             
+        except Exception as e:
+            print(f"Error adding alert indicators: {e}")
+            
+    def get_threshold_summary(self, parameter: str) -> dict:
+        """Get summary of threshold status for a parameter"""
+        try:
+            thresholds = self.thresholds.get(parameter, {})
+            return {
+                'parameter': parameter,
+                'has_thresholds': bool(thresholds),
+                'thresholds': thresholds,
+                'status': 'configured' if thresholds else 'not_configured'
+            }
+        except Exception as e:
+            print(f"Error getting threshold summary: {e}")
+            return {'parameter': parameter, 'status': 'error'}
+
+
 # Standalone utility functions for backwards compatibility
 def create_summary_chart(data: pd.DataFrame, title: str = "Parameter Summary") -> Figure:
     """Create summary chart with professional styling"""

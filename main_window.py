@@ -28,7 +28,7 @@ from PyQt5.QtGui import QKeySequence, QFont
 
 # Import enhanced plotting widgets for trend graphs
 try:
-    from plot_utils import EnhancedPlotWidget
+    from plot_utils import EnhancedPlotWidget, ThresholdPlotWidget
     PLOTTING_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Enhanced plotting not available: {e}")
@@ -36,7 +36,7 @@ except ImportError as e:
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
-        MainWindow.setWindowTitle("HALog • Professional LINAC Monitor")
+        MainWindow.setWindowTitle("HALog • Professional LINAC Monitoring System")
         MainWindow.resize(1400, 900)
         MainWindow.setMinimumSize(1000, 700)
 
@@ -392,7 +392,7 @@ class Ui_MainWindow(object):
         self.setup_dashboard_tab()
         self.setup_trends_tab()
         self.setup_analysis_tab()
-        # MPC tab removed for streamlined interface
+        # MPC tab removed - functionality not needed
         self.setup_fault_code_tab()
         self.setup_about_tab()
 
@@ -403,7 +403,7 @@ class Ui_MainWindow(object):
         layout.setSpacing(16)
         layout.setContentsMargins(20, 20, 20, 20)
 
-        header_label = QLabel("<h2>LINAC Water System Monitor</h2>")
+        header_label = QLabel("<h2>LINAC Monitoring System</h2>")
         header_label.setAlignment(Qt.AlignCenter)
         header_label.setWordWrap(True)
         layout.addWidget(header_label)
@@ -574,7 +574,11 @@ class Ui_MainWindow(object):
             "Mag Flow",  # Remove "Select parameter..." and make first item default
             "Flow Target", 
             "Flow Chiller Water",
-            "Cooling Pump Pressure"
+            "Cooling Pump Pressure",
+            "Water Tank Level",
+            "Chiller Flow",
+            "System Pressure",
+            "Water Pressure"
         ])
         # Set default selection to first parameter
         self.comboWaterTopGraph.setCurrentIndex(0)
@@ -588,7 +592,11 @@ class Ui_MainWindow(object):
             "Flow Target",  # Remove "Select parameter..." and set different default
             "Mag Flow",
             "Flow Chiller Water", 
-            "Cooling Pump Pressure"
+            "Cooling Pump Pressure",
+            "Water Tank Level",
+            "Chiller Flow",
+            "System Pressure",
+            "Water Pressure"
         ])
         # Set default selection to first parameter (different from top graph)
         self.comboWaterBottomGraph.setCurrentIndex(0)
@@ -608,12 +616,12 @@ class Ui_MainWindow(object):
         
         # FIXED: Use EnhancedPlotWidget instead of QFrame for graph widgets
         if PLOTTING_AVAILABLE:
-            self.waterGraphTop = EnhancedPlotWidget()
+            self.waterGraphTop = ThresholdPlotWidget()
             self.waterGraphTop.setMinimumHeight(200)
             self.waterGraphTop.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             graphs_layout.addWidget(self.waterGraphTop)
             
-            self.waterGraphBottom = EnhancedPlotWidget()
+            self.waterGraphBottom = ThresholdPlotWidget()
             self.waterGraphBottom.setMinimumHeight(200)
             self.waterGraphBottom.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             graphs_layout.addWidget(self.waterGraphBottom)
@@ -653,6 +661,8 @@ class Ui_MainWindow(object):
         self.comboVoltageTopGraph.addItems([
             "MLC Bank A 24V",  # Remove "Select parameter..." and make first item default
             "MLC Bank B 24V",
+            "COL 24V Monitor",
+            "COL 5V Monitor",
             "COL 48V",
             "MLC Bank A 48V",
             "MLC Bank B 48V",
@@ -674,6 +684,8 @@ class Ui_MainWindow(object):
         self.comboVoltageBottomGraph.addItems([
             "MLC Bank B 24V",  # Remove "Select parameter..." and set different default
             "MLC Bank A 24V",
+            "COL 24V Monitor",
+            "COL 5V Monitor",
             "COL 48V",
             "MLC Bank A 48V", 
             "MLC Bank B 48V",
@@ -702,12 +714,12 @@ class Ui_MainWindow(object):
         
         # FIXED: Use EnhancedPlotWidget instead of QFrame for voltage graph widgets
         if PLOTTING_AVAILABLE:
-            self.voltageGraphTop = EnhancedPlotWidget()
+            self.voltageGraphTop = ThresholdPlotWidget()
             self.voltageGraphTop.setMinimumHeight(200)
             self.voltageGraphTop.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             graphs_layout.addWidget(self.voltageGraphTop)
             
-            self.voltageGraphBottom = EnhancedPlotWidget()
+            self.voltageGraphBottom = ThresholdPlotWidget()
             self.voltageGraphBottom.setMinimumHeight(200)
             self.voltageGraphBottom.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             graphs_layout.addWidget(self.voltageGraphBottom)
@@ -750,6 +762,8 @@ class Ui_MainWindow(object):
             "Temp COL Board",
             "Temp Magnetron",
             "Temp Water Tank",
+            "Temp Ambient",
+            "Temp Chiller",
             "Temp MLC Bank A",
             "Temp MLC Bank B"
         ])
@@ -767,6 +781,8 @@ class Ui_MainWindow(object):
             "Temp COL Board",
             "Temp Magnetron",
             "Temp Water Tank",
+            "Temp Ambient",
+            "Temp Chiller",
             "Temp MLC Bank A",
             "Temp MLC Bank B"
         ])
@@ -788,12 +804,12 @@ class Ui_MainWindow(object):
         
         # FIXED: Use EnhancedPlotWidget instead of QFrame for temperature graph widgets
         if PLOTTING_AVAILABLE:
-            self.tempGraphTop = EnhancedPlotWidget()
+            self.tempGraphTop = ThresholdPlotWidget()
             self.tempGraphTop.setMinimumHeight(200)
             self.tempGraphTop.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             graphs_layout.addWidget(self.tempGraphTop)
             
-            self.tempGraphBottom = EnhancedPlotWidget()
+            self.tempGraphBottom = ThresholdPlotWidget()
             self.tempGraphBottom.setMinimumHeight(200)
             self.tempGraphBottom.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             graphs_layout.addWidget(self.tempGraphBottom)
@@ -864,12 +880,12 @@ class Ui_MainWindow(object):
         
         # FIXED: Use EnhancedPlotWidget instead of QFrame for humidity graph widgets
         if PLOTTING_AVAILABLE:
-            self.humidityGraphTop = EnhancedPlotWidget()
+            self.humidityGraphTop = ThresholdPlotWidget()
             self.humidityGraphTop.setMinimumHeight(200)
             self.humidityGraphTop.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             graphs_layout.addWidget(self.humidityGraphTop)
             
-            self.humidityGraphBottom = EnhancedPlotWidget()
+            self.humidityGraphBottom = ThresholdPlotWidget()
             self.humidityGraphBottom.setMinimumHeight(200)
             self.humidityGraphBottom.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             graphs_layout.addWidget(self.humidityGraphBottom)
@@ -944,12 +960,12 @@ class Ui_MainWindow(object):
         
         # FIXED: Use EnhancedPlotWidget instead of QFrame for fan speed graph widgets
         if PLOTTING_AVAILABLE:
-            self.fanGraphTop = EnhancedPlotWidget()
+            self.fanGraphTop = ThresholdPlotWidget()
             self.fanGraphTop.setMinimumHeight(200)
             self.fanGraphTop.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             graphs_layout.addWidget(self.fanGraphTop)
             
-            self.fanGraphBottom = EnhancedPlotWidget()
+            self.fanGraphBottom = ThresholdPlotWidget()
             self.fanGraphBottom.setMinimumHeight(200)
             self.fanGraphBottom.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             graphs_layout.addWidget(self.fanGraphBottom)
@@ -1088,10 +1104,7 @@ class Ui_MainWindow(object):
         trends_layout.addWidget(self.tableTrends)
         layout.addWidget(trends_group)
 
-    # MPC tab setup method removed for streamlined interface
-    
-
-    
+    # MPC tab removed - functionality not needed
 
     def setup_fault_code_tab(self):
         self.tabFaultCode = QWidget()

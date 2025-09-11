@@ -1,0 +1,1 @@
+{"settings": {"theme": "dark", "language": "en"}, "users": [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}], "metrics": {"count": 12345, "avg_time": 2.5}}

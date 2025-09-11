@@ -1,0 +1,78 @@
+# HALog - Professional LINAC Monitoring System
+
+## Overview
+HALog is a professional desktop application for monitoring LINAC (Linear Accelerator) systems, developed by gobioeng.com. This is a PyQt5-based GUI application that provides data analysis, fault code management, and comprehensive system monitoring capabilities for medical linear accelerator systems.
+
+**Current Status**: Successfully imported and configured to run in Replit environment using VNC display
+**Version**: 0.0.1 (Beta)
+**Last Updated**: 2025-09-11
+
+## Project Architecture
+
+### Core Components
+- **main.py**: Main application entry point with PyQt5 GUI framework
+- **run_halog.py**: Replit-specific wrapper script for VNC/offscreen display configuration
+- **main_window.py**: Primary UI window definition 
+- **database.py**: Database management with SQLite backend
+- **unified_parser.py**: Fault code and data parsing system
+- **fault_notes_manager.py**: Fault annotation and management
+- **machine_manager.py**: Multi-machine support system
+
+### Key Features
+- Real-time LINAC system monitoring (water, voltage, temperature, humidity, fans)
+- Fault code database (HAL and TB fault systems)
+- Data trend analysis and visualization
+- Multi-machine management support
+- Professional Material Design UI
+- SQLite database with backup support
+
+### Data Structure
+- **data/**: Core application data directory
+  - `HALfault.txt`: HAL system fault code database
+  - `TBFault.txt`: TB system fault code database
+  - `database/`: SQLite database files with backup metadata
+  - `cache/`: Performance and data caching system
+
+## Technology Stack
+- **Framework**: PyQt5 (GUI), SQLite (Database)
+- **Analytics**: pandas, numpy, scipy, scikit-learn
+- **Visualization**: matplotlib, pyqtgraph
+- **Platform**: Python 3.11 with VNC support for Replit
+
+## Recent Changes
+- **2025-09-11**: Imported from GitHub and configured for Replit environment
+  - Created VNC-compatible wrapper script (run_halog.py)
+  - Configured PyQt5 for offscreen/VNC display mode
+  - Set up workflow for desktop application execution
+  - Verified all Python dependencies installation
+
+## Replit Configuration
+
+### Running the Application
+The application runs as a desktop GUI using Replit's VNC display:
+- **Command**: `python run_halog.py`
+- **Display Mode**: VNC (Virtual Network Computing)
+- **Platform**: PyQt5 offscreen with VNC fallback
+
+### User Interface Access
+- The GUI appears in Replit's VNC viewer panel
+- Workflow is configured to automatically start the application
+- Desktop interface provides full LINAC monitoring functionality
+
+### Development Notes
+- Application uses offscreen rendering for Replit compatibility
+- VNC platform provides desktop GUI access through web browser
+- All dependencies are pre-installed and ready for immediate use
+- Database and cache systems are fully functional
+
+## User Preferences
+- Professional Material Design styling preferred
+- Desktop application interface (not web-based)
+- Scientific/medical equipment monitoring focus
+- Multi-machine system support required
+
+## Deployment
+- **Environment**: Replit VNC Desktop Application
+- **Type**: Desktop GUI (not web deployment)
+- **Dependencies**: All Python packages installed via requirements.txt
+- **Database**: SQLite with automatic backup management

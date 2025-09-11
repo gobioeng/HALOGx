@@ -15,7 +15,7 @@ VSVersionInfo(
       StringTable(
         u'040904B0',
         [StringStruct(u'CompanyName', u'gobioeng.com'),
-         StringStruct(u'FileDescription', u'Professional LINAC Water System Monitor'),
+         StringStruct(u'FileDescription', u'Professional LINAC Monitoring System'),
          StringStruct(u'FileVersion', u'0.0.1'),
          StringStruct(u'InternalName', u'HALbasic'),
          StringStruct(u'LegalCopyright', u'Copyright © 2025 gobioeng.com'),

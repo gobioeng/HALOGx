@@ -17,6 +17,14 @@ from typing import Dict, List, Tuple, Optional
 import os
 import random
 
+# Import caching system for fault code optimization
+try:
+    from cache_manager import DataCacheManager
+    CACHING_AVAILABLE = True
+except ImportError:
+    CACHING_AVAILABLE = False
+    print("⚠️ Caching not available - fault code loading will be slower")
+
 
 class UnifiedParser:
     """
@@ -38,15 +46,19 @@ class UnifiedParser:
         self.parameter_mapping = {}  # Initialize before calling _init_parameter_mapping
         self.df: Optional[pd.DataFrame] = None # Initialize df to None
         
-        # Initialize parameter configuration manager
-        try:
-            from parameter_config_manager import ParameterConfigManager
-            self.param_config_manager = ParameterConfigManager()
-            self._load_dynamic_parameter_mapping()
-        except ImportError:
-            print("⚠️ ParameterConfigManager not available, using static mapping")
-            self.param_config_manager = None
-            self._init_parameter_mapping()  # Fall back to static mapping
+        # Initialize fault code caching system for performance optimization
+        if CACHING_AVAILABLE:
+            self.fault_cache = DataCacheManager(cache_dir="data/cache/fault_codes")
+            # Initialize search result cache for frequently searched codes
+            self.search_cache = DataCacheManager(cache_dir="data/cache/fault_searches")
+            print("✅ Fault code caching system initialized - faster loading enabled")
+            print("✅ Search result caching enabled - frequently searched codes load instantly")
+        else:
+            self.fault_cache = None
+            self.search_cache = None
+            print("⚠️ Operating without fault code caching")
+            
+        self._init_parameter_mapping()  # Call after other initializations
 
     def get_fault_descriptions_by_database(self, fault_code):
         """Get fault descriptions from both HAL and TB databases"""
@@ -92,44 +104,6 @@ class UnifiedParser:
             "serial_alt": re.compile(r"Serial[:\s]+(\d+)", re.IGNORECASE),
             "machine_id": re.compile(r"Machine[:\s]+(\d+)", re.IGNORECASE),
         }
-
-    def _load_dynamic_parameter_mapping(self):
-        """Load parameter mapping from ParameterConfigManager"""
-        if self.param_config_manager is None:
-            return
-            
-        try:
-            # Get all parameters from config manager
-            dynamic_mapping = self.param_config_manager.get_all_parameters()
-            
-            # Convert to format expected by UnifiedParser
-            self.parameter_mapping = {}
-            for param_name, config in dynamic_mapping.items():
-                self.parameter_mapping[param_name] = {
-                    "patterns": config.get("patterns", [param_name]),
-                    "unit": config.get("unit", ""),
-                    "description": config.get("description", param_name),
-                    "expected_range": config.get("expected_range"),
-                    "critical_range": config.get("critical_range"),
-                    "parameter_type": config.get("parameter_type", "general")
-                }
-                
-            print(f"✅ Loaded {len(self.parameter_mapping)} parameters from dynamic config")
-            
-            # Validate the mapping
-            warnings, errors = self.param_config_manager.validate_parameter_mapping()
-            if warnings:
-                print(f"⚠️ Parameter mapping warnings: {len(warnings)}")
-                for warning in warnings[:3]:  # Show first 3 warnings
-                    print(f"   • {warning}")
-            if errors:
-                print(f"❌ Parameter mapping errors: {len(errors)}")
-                for error in errors[:3]:  # Show first 3 errors
-                    print(f"   • {error}")
-                    
-        except Exception as e:
-            print(f"❌ Error loading dynamic parameter mapping: {e}")
-            self._init_parameter_mapping()  # Fall back to static mapping
 
     def _init_parameter_mapping(self):
         """Initialize comprehensive parameter mapping for all parameters"""
@@ -833,12 +807,36 @@ class UnifiedParser:
 
     # Fault Code Parsing Methods
     def load_fault_codes_from_file(self, file_path, source_type='uploaded'):
-        """Load fault codes from file with specified source type"""
+        """Load fault codes from file with caching for performance optimization"""
         try:
             if not os.path.exists(file_path):
                 print(f"Fault code file not found: {file_path}")
                 return False
 
+            # Create cache key based on full file path hash, modification time, and source type
+            import hashlib
+            file_stat = os.stat(file_path)
+            file_path_hash = hashlib.md5(file_path.encode()).hexdigest()[:8]
+            cache_key = f"fault_codes_{source_type}_{file_path_hash}_{file_stat.st_mtime}"
+            
+            # Try to load from cache first for significant performance boost
+            if self.fault_cache:
+                try:
+                    cached_fault_codes = self.fault_cache.get_cached_data(cache_key, ttl=86400)  # 24 hour TTL
+                    if cached_fault_codes is not None:
+                        # Merge cached data into current fault_codes
+                        for code, data in cached_fault_codes.items():
+                            self.fault_codes[code] = data
+                        loaded_count = len(cached_fault_codes)
+                        print(f"✅ 🚀 Loaded {loaded_count} fault codes from {source_type.upper()} cache (instant)")
+                        return True
+                except Exception as cache_error:
+                    print(f"⚠️ Cache read failed: {cache_error}, falling back to file parsing")
+            
+            # If no cache hit, parse from file (slower but comprehensive)
+            print(f"🔄 Parsing {source_type.upper()} fault codes from file...")
+            new_fault_codes = {}
+            
             with open(file_path, 'r', encoding='utf-8') as file:
                 for line_num, line in enumerate(file, 1):
                     line = line.strip()
@@ -857,15 +855,34 @@ class UnifiedParser:
                         else:
                             db_desc = f'{source_type.upper()} Description'
 
-                        self.fault_codes[code] = {
+                        fault_data = {
                             'description': fault_info['description'],
                             'source': source_type,
                             'line_number': line_num,
                             'database_description': db_desc,
                             'type': fault_info.get('type', 'Fault')
                         }
+                        
+                        # Store in new_fault_codes for caching and self.fault_codes for immediate use
+                        # Handle HAL/TB collision by prefixing codes with source for internal storage
+                        storage_key = f"{source_type}_{code}" if source_type in ['hal', 'tb'] else code
+                        new_fault_codes[code] = fault_data  # Cache uses original code
+                        self.fault_codes[storage_key] = fault_data  # Internal storage uses prefixed key
+                        # Also store with original code for backward compatibility
+                        if source_type not in ['hal', 'tb'] or code not in self.fault_codes:
+                            self.fault_codes[code] = fault_data
 
-            loaded_count = len([c for c in self.fault_codes.values() if c['source'] == source_type])
+            # Cache the parsed fault codes for future use with robust error handling
+            if self.fault_cache and new_fault_codes:
+                try:
+                    self.fault_cache.cache_data(cache_key, new_fault_codes)
+                    print(f"✅ 💾 Cached {len(new_fault_codes)} {source_type.upper()} fault codes for instant future loading")
+                except Exception as cache_error:
+                    print(f"⚠️ Failed to cache {source_type.upper()} fault codes: {cache_error}")
+            elif new_fault_codes:
+                print(f"⚠️ Caching not available - {len(new_fault_codes)} {source_type.upper()} fault codes will be reparsed next time")
+            
+            loaded_count = len(new_fault_codes)
             print(f"✓ Loaded {loaded_count} fault codes from {source_type.upper()} database")
             return True
 
@@ -897,13 +914,38 @@ class UnifiedParser:
         return None
 
     def search_fault_code(self, code: str) -> Dict:
-        """Search for fault code in loaded database"""
+        """Search for fault code with caching for instant results on repeated searches"""
         code = str(code).strip()
+        
+        # Try to get cached search result first for instant performance boost
+        if self.search_cache:
+            cache_key = f"search_code_{code}"
+            try:
+                cached_result = self.search_cache.get_cached_data(cache_key, ttl=3600)  # 1 hour TTL
+                if cached_result is not None:
+                    print(f"⚡ Fault code {code} loaded from search cache (instant)")
+                    return cached_result
+            except Exception as cache_error:
+                print(f"⚠️ Search cache read failed: {cache_error}")
 
+        # Perform actual search if not cached - check multiple storage keys for HAL/TB collision resolution
+        fault_data = None
+        source = 'unknown'
+        
+        # First try direct lookup
         if code in self.fault_codes:
             fault_data = self.fault_codes[code]
             source = fault_data.get('source', 'unknown')
-
+        else:
+            # Try prefixed lookups for HAL/TB collision resolution
+            for prefix in ['hal', 'tb', 'uploaded']:
+                prefixed_key = f"{prefix}_{code}"
+                if prefixed_key in self.fault_codes:
+                    fault_data = self.fault_codes[prefixed_key]
+                    source = fault_data.get('source', prefix)
+                    break
+        
+        if fault_data:
             # Map source to proper database description
             if source == 'uploaded':
                 db_desc = 'HAL Database'
@@ -912,7 +954,7 @@ class UnifiedParser:
             else:
                 db_desc = f"{source.title()} Database"
 
-            return {
+            search_result = {
                 'found': True,
                 'code': code,
                 'description': fault_data['description'],
@@ -924,7 +966,7 @@ class UnifiedParser:
                 'tb_description': fault_data['description'] if source == 'tb' else ''
             }
         else:
-            return {
+            search_result = {
                 'found': False,
                 'code': code,
                 'description': 'Fault code not found in loaded database',
@@ -935,6 +977,15 @@ class UnifiedParser:
                 'hal_description': '',
                 'tb_description': ''
             }
+        
+        # Cache the search result for future instant access
+        if self.search_cache:
+            try:
+                self.search_cache.cache_data(cache_key, search_result)
+            except Exception as cache_error:
+                print(f"⚠️ Failed to cache search result: {cache_error}")
+        
+        return search_result
 
     def search_description(self, search_term: str) -> List[Tuple[str, Dict]]:
         """Search fault codes by description keywords"""
@@ -1352,60 +1403,3 @@ class UnifiedParser:
 
         except Exception as e:
             return pd.DataFrame()
-            
-    def reload_parameter_mapping(self) -> bool:
-        """Reload parameter mapping from configuration file"""
-        if self.param_config_manager is None:
-            print("⚠️ Parameter config manager not available")
-            return False
-            
-        try:
-            print("🔄 Reloading parameter mapping...")
-            success = self.param_config_manager.reload_config()
-            if success:
-                self._load_dynamic_parameter_mapping()
-                print("✅ Parameter mapping reloaded successfully")
-            return success
-        except Exception as e:
-            print(f"❌ Error reloading parameter mapping: {e}")
-            return False
-            
-    def enable_parameter_auto_reload(self, check_interval: float = 2.0):
-        """Enable auto-reload of parameter mapping when config file changes"""
-        if self.param_config_manager is None:
-            print("⚠️ Parameter config manager not available")
-            return
-            
-        self.param_config_manager.enable_auto_reload(check_interval)
-        
-    def disable_parameter_auto_reload(self):
-        """Disable auto-reload of parameter mapping"""
-        if self.param_config_manager is None:
-            return
-            
-        self.param_config_manager.disable_auto_reload()
-        
-    def get_parameter_statistics(self) -> Dict:
-        """Get statistics about parameter mapping"""
-        if self.param_config_manager is None:
-            return {
-                "total_parameters": len(self.parameter_mapping),
-                "source": "static_mapping",
-                "auto_reload_enabled": False
-            }
-            
-        stats = self.param_config_manager.get_statistics()
-        stats["source"] = "dynamic_mapping"
-        return stats
-        
-    def find_parameter_by_log_name(self, log_parameter_name: str) -> Optional[str]:
-        """Find mapped parameter name by log parameter name"""
-        if self.param_config_manager is None:
-            # Fall back to basic pattern matching
-            for param_name, config in self.parameter_mapping.items():
-                patterns = config.get("patterns", [])
-                if log_parameter_name in patterns:
-                    return param_name
-            return None
-            
-        return self.param_config_manager.find_parameter_by_pattern(log_parameter_name)

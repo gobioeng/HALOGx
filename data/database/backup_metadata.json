@@ -3,22 +3,22 @@
   "created_at": "2025-09-03T07:22:44.099338",
   "backups": [
     {
-      "filename": "halog_water_backup_20250911_110753.db",
-      "created_at": "2025-09-11T11:07:53.318904",
+      "filename": "halog_water_backup_20250911_131928.db",
+      "created_at": "2025-09-11T13:19:28.616105",
       "source_path": "data\\database\\halog_water.db",
-      "file_size": 2904064
+      "file_size": 5869568
     },
     {
-      "filename": "halog_water_backup_20250903_112149.db",
-      "created_at": "2025-09-03T11:21:49.650804",
+      "filename": "halog_water_backup_20250911_131455.db",
+      "created_at": "2025-09-11T13:14:55.398495",
       "source_path": "data\\database\\halog_water.db",
-      "file_size": 1740800
+      "file_size": 4096
     },
     {
-      "filename": "halog_water_backup_20250903_112049.db",
-      "created_at": "2025-09-03T11:20:49.482828",
-      "source_path": "data\\database\\halog_water.db",
-      "file_size": 1740800
+      "filename": "halog_water_backup_20250911_120010.db",
+      "created_at": "2025-09-11T12:00:10.002770",
+      "source_path": "data/database/halog_water.db",
+      "file_size": 4096
     }
   ]
 }

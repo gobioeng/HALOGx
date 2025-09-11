@@ -231,7 +231,7 @@ class HALogApp:
 
                 # SECOND: Set window properties
                 self.setWindowTitle(
-                    f"HALog {APP_VERSION} • Professional LINAC Monitor • gobioeng.com"
+                    f"HALog {APP_VERSION} • Professional LINAC Monitoring System • gobioeng.com"
                 )
                 if app_icon:
                     self.setWindowIcon(app_icon)
@@ -768,7 +768,7 @@ class HALogApp:
                         self.ui.comboFanBottomGraph.currentIndexChanged.connect(lambda: self.refresh_trend_tab('fan_speed'))
                     print("✓ Trend dropdown change events connected")
 
-                    # MPC TAB ACTIONS - REMOVED for streamlined interface
+                    # MPC tab removed - functionality not needed
 
                     # ANALYSIS TAB ACTIONS - Enhanced controls
                     if hasattr(self.ui, 'btnRefreshAnalysis'):
@@ -1138,40 +1138,6 @@ class HALogApp:
                     import traceback
                     traceback.print_exc()
 
-            def refresh_threshold_analysis(self):
-                """Refresh threshold analysis widget with current data"""
-                try:
-                    # Check if threshold widget exists
-                    if not hasattr(self.ui, 'threshold_plot_widget'):
-                        print("⚠️ Threshold plot widget not available")
-                        return
-                    
-                    # Ensure we have data
-                    if not hasattr(self, 'df') or self.df.empty:
-                        print("⚠️ No data available for threshold analysis")
-                        return
-                        
-                    # Get parameter mapping from UnifiedParser
-                    parameter_mapping = None
-                    if hasattr(self, 'parser') and hasattr(self.parser, 'parameter_mapping'):
-                        parameter_mapping = self.parser.parameter_mapping
-                    
-                    # Set data in the threshold widget
-                    self.ui.threshold_plot_widget.set_data(self.df, parameter_mapping)
-                    
-                    # Auto-add some key parameters for initial display
-                    key_parameters = ['magnetronFlow', 'targetAndCirculatorFlow', 'magnetronTemp', 'targetAndCirculatorTemp']
-                    for param in key_parameters[:2]:  # Start with 2 parameters
-                        if param in self.df.columns:
-                            self.ui.threshold_plot_widget.add_parameter_with_thresholds(param)
-                            
-                    print("✅ Threshold analysis updated successfully")
-                    
-                except Exception as e:
-                    print(f"❌ Error refreshing threshold analysis: {e}")
-                    import traceback
-                    traceback.print_exc()
-
             def _get_parameter_data_by_description(self, parameter_description):
                 """Optimized parameter data retrieval with caching and minimal logging"""
                 try:
@@ -1301,252 +1267,17 @@ class HALogApp:
                     print(f"Error getting multi-machine parameter data: {e}")
                     return {}
 
-            def refresh_latest_mpc(self):
-                """Load and display MPC results from database with single date selection"""
-                try:
-                    print("🔄 Loading MPC data from database...")
+            # refresh_latest_mpc removed - MPC functionality not needed
 
-                    # Update available dates in dropdown
-                    self._populate_mpc_date_dropdown()
+            # _populate_mpc_date_dropdown removed - MPC functionality not needed
 
-                    # Get selected date
-                    selected_date = None
-                    if hasattr(self.ui, 'comboMPCDate') and self.ui.comboMPCDate.currentIndex() > 0:
-                        selected_date = self.ui.comboMPCDate.currentText()
+            # _get_mpc_data_for_date removed - MPC functionality not needed
 
-                    # Get MPC data for selected date
-                    mpc_data = self._get_mpc_data_for_date(selected_date)
+            # _populate_mpc_table removed - MPC functionality not needed
 
-                    if not mpc_data:
-                        # Show helpful message about what data is needed
-                        QtWidgets.QMessageBox.information(
-                            self, "No MPC Data",
-                            "No machine performance data available.\n\n"
-                            "Import log files containing machine performance parameters "
-                            "(magnetron flow, temperature readings, voltage levels, etc.) "
-                            "to enable MPC analysis."
-                        )
-                        return
+            # _update_mpc_statistics removed - MPC functionality not needed
 
-                    # Update the last update info
-                    if hasattr(self.ui, 'lblLastMPCUpdate'):
-                        from datetime import datetime
-                        update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        date_info = f" (Date: {selected_date})" if selected_date else ""
-                        self.ui.lblLastMPCUpdate.setText(f"Last MPC Update: {update_time}{date_info}")
-
-                    # Update the MPC table with data
-                    self._populate_mpc_table(mpc_data)
-
-                    print("✅ MPC data loaded successfully")
-
-                except Exception as e:
-                    print(f"❌ Error loading MPC data: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    QtWidgets.QMessageBox.critical(
-                        self, "MPC Load Error",
-                        f"Error loading MPC data: {str(e)}"
-                    )
-
-            def _populate_mpc_date_dropdown(self):
-                """Populate MPC date selection dropdown with available dates from database"""
-                try:
-                    if not hasattr(self, 'df') or self.df.empty:
-                        print("No data available for MPC date selection")
-                        return
-
-                    # Get unique dates from the database
-                    unique_dates = sorted(self.df['datetime'].dt.date.unique(), reverse=True)
-                    date_strings = [date.strftime('%Y-%m-%d') for date in unique_dates]
-
-                    # Update date dropdown
-                    if hasattr(self.ui, 'comboMPCDate'):
-                        current_date = self.ui.comboMPCDate.currentText()
-                        self.ui.comboMPCDate.blockSignals(True)
-                        self.ui.comboMPCDate.clear()
-                        self.ui.comboMPCDate.addItem("Select date...")
-                        self.ui.comboMPCDate.addItems(date_strings)
-
-                        # Restore selection if it still exists
-                        if current_date in date_strings:
-                            index = self.ui.comboMPCDate.findText(current_date)
-                            if index >= 0:
-                                self.ui.comboMPCDate.setCurrentIndex(index)
-
-                        self.ui.comboMPCDate.blockSignals(False)
-
-                    print(f"Updated MPC date dropdown with {len(date_strings)} dates")
-
-                except Exception as e:
-                    print(f"Error populating MPC date dropdown: {e}")
-
-            def _get_mpc_data_for_date(self, selected_date=None):
-                """Get MPC data for a specific date"""
-                try:
-                    if not hasattr(self, 'df') or self.df.empty:
-                        return None
-
-                    # Define key MPC parameters to monitor
-                    mpc_params = [
-                        'magnetronFlow', 'magnetronTemp', 'targetAndCirculatorFlow', 'targetAndCirculatorTemp',
-                        'FanremoteTempStatistics', 'FanhumidityStatistics',
-                        'FanfanSpeed1Statistics', 'FanfanSpeed2Statistics', 'FanfanSpeed3Statistics', 'FanfanSpeed4Statistics',
-                        'MLC_ADC_CHAN_TEMP_BANKA_STAT_24V', 'MLC_ADC_CHAN_TEMP_BANKB_STAT_24V'
-                    ]
-
-                    import pandas as pd
-                    results = []
-
-                    for param in mpc_params:
-                        param_data = self.df[self.df['param'] == param]
-
-                        if param_data.empty:
-                            continue
-
-                        # Get description from parser mapping if available
-                        description = param
-                        if hasattr(self, 'parser') and hasattr(self.parser, 'parameter_mapping'):
-                            mapping = self.parser.parameter_mapping.get(param, {})
-                            description = mapping.get('description', param)
-
-                        value = "NA"
-                        status = "NA"
-
-                        # Get data for selected date
-                        if selected_date:
-                            date_data = param_data[param_data['datetime'].dt.date == pd.to_datetime(selected_date).date()]
-                            if not date_data.empty:
-                                avg_value = date_data['avg'].iloc[-1] if 'avg' in date_data.columns else date_data['average'].iloc[-1] if 'average' in date_data.columns else 0
-                                value = f"{avg_value:.2f}"
-                                
-                                # Simple status check based on reasonable ranges
-                                try:
-                                    val = float(avg_value)
-                                    if 'flow' in param.lower() and (val < 0 or val > 100):
-                                        status = "WARNING"
-                                    elif 'temp' in param.lower() and (val < 0 or val > 80):
-                                        status = "WARNING"
-                                    elif 'speed' in param.lower() and (val < 0 or val > 5000):
-                                        status = "WARNING"
-                                    elif 'volt' in param.lower() or '24v' in param.lower() and (val < 20 or val > 28):
-                                        status = "WARNING"
-                                    else:
-                                        status = "PASS"
-                                except:
-                                    status = "CHECK"
-                        else:
-                            # If no date selected, use latest available data
-                            if not param_data.empty:
-                                latest_data = param_data.iloc[-1]
-                                avg_value = latest_data['avg'] if 'avg' in latest_data else latest_data['average'] if 'average' in latest_data else 0
-                                value = f"{avg_value:.2f}"
-                                status = "PASS"
-
-                        results.append({
-                            'parameter': description,
-                            'value': value,
-                            'status': status
-                        })
-
-                    return results if results else None
-
-                except Exception as e:
-                    print(f"Error getting MPC data for date: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    return None
-
-            def _populate_mpc_table(self, mpc_data):
-                """Populate MPC table with data"""
-                try:
-                    from PyQt5 import QtGui
-                    from PyQt5.QtWidgets import QTableWidgetItem, QLabel
-                    from PyQt5.QtCore import Qt
-
-                    if not mpc_data:
-                        self.ui.tableMPC.setRowCount(0)
-                        return
-
-                    self.ui.tableMPC.setRowCount(len(mpc_data))
-
-                    for row, data in enumerate(mpc_data):
-                        # Parameter name
-                        param_item = QLabel(data['parameter'])
-                        param_item.setWordWrap(True)
-                        param_item.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                        param_item.setMargin(5)
-                        self.ui.tableMPC.setCellWidget(row, 0, param_item)
-
-                        # Value
-                        value_item = QTableWidgetItem(data['value'])
-                        if data['value'] == "NA":
-                            value_item.setBackground(Qt.lightGray)
-                        value_item.setTextAlignment(Qt.AlignCenter)
-                        self.ui.tableMPC.setItem(row, 1, value_item)
-
-                        # Status with color coding
-                        status_item = QLabel(data['status'])
-                        status_item.setAlignment(Qt.AlignCenter)
-
-                        if data['status'] == "PASS":
-                            status_item.setStyleSheet("color: #1B5E20; font-weight: 600; background-color: #E8F5E8; padding: 6px; border-radius: 6px;")
-                        elif data['status'] == "FAIL":
-                            status_item.setStyleSheet("color: #B71C1C; font-weight: 600; background-color: #FFEBEE; padding: 6px; border-radius: 6px;")
-                        elif data['status'] == "WARNING":
-                            status_item.setStyleSheet("color: #E65100; font-weight: 600; background-color: #FFF3E0; padding: 6px; border-radius: 6px;")
-                        elif data['status'] == "NA":
-                            status_item.setStyleSheet("color: #616161; font-weight: 600; background-color: #F5F5F5; padding: 6px; border-radius: 6px;")
-                        else:
-                            status_item.setStyleSheet("color: #1976D2; font-weight: 600; background-color: #E3F2FD; padding: 6px; border-radius: 6px;")
-
-                        self.ui.tableMPC.setCellWidget(row, 2, status_item)
-
-                    # Resize rows to fit content
-                    self.ui.tableMPC.resizeRowsToContents()
-
-                    # Update statistics
-                    self._update_mpc_statistics(mpc_data)
-
-                except Exception as e:
-                    print(f"Error populating MPC table: {e}")
-                    import traceback
-                    traceback.print_exc()
-
-            def _update_mpc_statistics(self, mpc_data):
-                """Update MPC statistics based on data"""
-                try:
-                    if not mpc_data:
-                        return
-
-                    total = len(mpc_data)
-                    passed = sum(1 for item in mpc_data if item['status'] == 'PASS')
-                    failed = sum(1 for item in mpc_data if item['status'] == 'FAIL')
-                    warnings = sum(1 for item in mpc_data if item['status'] == 'WARNING')
-                    na_count = sum(1 for item in mpc_data if item['status'] == 'NA')
-
-                    # Update statistics labels if they exist
-                    if hasattr(self.ui, 'lblTotalParams'):
-                        self.ui.lblTotalParams.setText(f"Total Parameters: {total}")
-                    if hasattr(self.ui, 'lblPassedParams'):
-                        self.ui.lblPassedParams.setText(f"Passed: {passed}")
-                    if hasattr(self.ui, 'lblFailedParams'):
-                        self.ui.lblFailedParams.setText(f"Failed: {failed}")
-                    if hasattr(self.ui, 'lblWarningParams'):
-                        self.ui.lblWarningParams.setText(f"Warnings: {warnings}")
-
-                    # Calculate pass rate excluding NA values
-                    evaluated = total - na_count
-                    pass_rate = (passed / evaluated * 100) if evaluated > 0 else 0
-
-                    print(f"MPC Statistics: {passed}/{evaluated} passed ({pass_rate:.1f}%), {warnings} warnings, {failed} failed, {na_count} NA")
-
-                except Exception as e:
-                    print(f"Error updating MPC statistics: {e}")
-
-            def compare_mpc_results(self):
-                """Legacy function - removed for streamlined interface"""
-                print("⚠️ MPC functionality removed for streamlined interface")
+            # compare_mpc_results removed - MPC functionality not needed
 
             def search_fault_code(self):
                 """Search for fault code by code number"""
@@ -1910,7 +1641,7 @@ Source: {result.get('source', 'unknown')} database
                     QtWidgets.QMessageBox.about(
                         self,
                         "Gobioeng HALog",
-                        "HALog 0.0.1 beta\nProfessional LINAC Log Analysis System\nDeveloped by gobioeng.com\n© 2025 gobioeng.com",
+                        "HALog 0.0.1 beta\nProfessional LINAC Monitoring System\nDeveloped by gobioeng.com\n© 2025 gobioeng.com",
                     )
 
             def load_dashboard(self):
@@ -2027,7 +1758,7 @@ Source: {result.get('source', 'unknown')} database
                     # Initialize trend graphs with default parameters only if we have data
                     if not self.df.empty:
                         QtCore.QTimer.singleShot(300, self._refresh_all_trends)
-                        # MPC tab initialization removed
+                        # MPC refresh removed
 
                 except Exception as e:
                     print(f"Error loading dashboard: {e}")
@@ -2082,13 +1813,6 @@ Source: {result.get('source', 'unknown')} database
                             self.refresh_trend_tab(group)
                         except Exception as e:
                             print(f"  Error refreshing {group} trends: {e}")
-
-                    # Refresh threshold analysis with all data
-                    try:
-                        print("  Refreshing threshold analysis...")
-                        self.refresh_threshold_analysis()
-                    except Exception as e:
-                        print(f"  Error refreshing threshold analysis: {e}")
 
                     print("✅ All trend graphs refreshed")
 
@@ -2349,7 +2073,7 @@ Source: {result.get('source', 'unknown')} database
                             )
                             progress_dialog.setWindowModality(QtCore.Qt.WindowModal)
                             progress_dialog.setMinimumDuration(0)
-                            self.progress_dialog.setValue(0)
+                            progress_dialog.setValue(0)
                             progress_dialog.show()
 
                             analyzer = DataAnalyzer()
@@ -2362,7 +2086,7 @@ Source: {result.get('source', 'unknown')} database
                             self._active_analysis_workers.append(worker)
 
                             worker.analysis_progress.connect(
-                                lambda p, m: self.progress_dialog.setValue(p)
+                                lambda p, m: progress_dialog.setValue(p)
                             )
                             worker.analysis_finished.connect(
                                 lambda results: self._display_analysis_results(
@@ -2449,8 +2173,8 @@ Source: {result.get('source', 'unknown')} database
                 """Display analysis results after worker completes"""
                 try:
                     if progress_dialog:
-                        self.progress_dialog.setValue(100)
-                        self.progress_dialog.close()
+                        progress_dialog.setValue(100)
+                        progress_dialog.close()
 
                     if "trends" in results:
                         self._populate_trends_table(results["trends"])
@@ -2461,7 +2185,7 @@ Source: {result.get('source', 'unknown')} database
                 """Handle analysis errors from worker thread"""
                 try:
                     if progress_dialog:
-                        self.progress_dialog.close()
+                        progress_dialog.close()
 
                     QtWidgets.QMessageBox.warning(
                         self,
@@ -2701,9 +2425,9 @@ Source: {result.get('source', 'unknown')} database
                         if index == 1:  # Trends tab
                             self.update_trend()
                             tab_data = {"type": "trend", "updated_at": current_time}
-                        elif index == 2:  # Data Table tab - REMOVED
-                            # Data table removed - skip update
-                            tab_data = {"type": "removed_data_table", "updated_at": current_time}
+                        elif index == 2:  # Data Table tab
+                    # Data table removed - skip update
+                            tab_data = {"type": "data_table", "updated_at": current_time}
                         elif index == 3:  # Analysis tab
                             self.update_analysis_tab()
                             tab_data = {"type": "analysis", "updated_at": current_time}
@@ -2961,14 +2685,14 @@ Source: {result.get('source', 'unknown')} database
                         # Initialize default trend displays
                         QtCore.QTimer.singleShot(500, self._refresh_all_trends)
 
-                        # MPC tab initialization removed
+                        # MPC initialization removed
 
                         # Mark as complete and keep progress dialog until user sees success message
                         self.progress_dialog.mark_complete()
                         QtCore.QTimer.singleShot(100, self._show_success_message_and_close_progress)
                         return
                     else:
-                        self.self.progress_dialog.close()
+                        self.progress_dialog.close()
                         QtWidgets.QMessageBox.warning(
                             self,
                             "Import Warning",
@@ -2979,7 +2703,7 @@ Source: {result.get('source', 'unknown')} database
                 except Exception as e:
                     # Close progress dialog if it exists
                     if hasattr(self, 'progress_dialog') and self.progress_dialog:
-                        self.self.progress_dialog.close()
+                        self.progress_dialog.close()
                     
                     print(f"Error in import_log_file: {e}")
                     traceback.print_exc()
@@ -2991,7 +2715,7 @@ Source: {result.get('source', 'unknown')} database
                 """Show success message and close progress dialog"""
                 try:
                     if hasattr(self, 'progress_dialog') and self.progress_dialog:
-                        self.self.progress_dialog.close()
+                        self.progress_dialog.close()
                     
                     # Get the latest data for success message
                     total_records = len(self.df) if hasattr(self, 'df') and not self.df.empty else 0
@@ -3064,7 +2788,7 @@ Source: {result.get('source', 'unknown')} database
                     print(f"Batch insert completed: {records_inserted} records in {duration:.2f}s ({records_per_sec:.1f} records/sec)")
                     
                     # Insert file metadata
-                    self.progress_dialog.update_progress(95, "Saving metadata...")
+                    progress_dialog.update_progress(95, "Saving metadata...")
                     QtWidgets.QApplication.processEvents()
                     
                     filename = os.path.basename(file_path)
@@ -3076,9 +2800,9 @@ Source: {result.get('source', 'unknown')} database
                         parsing_stats=parsing_stats_json,
                     )
                     
-                    self.progress_dialog.mark_complete()
+                    progress_dialog.mark_complete()
                     QtWidgets.QApplication.processEvents()
-                    self.self.progress_dialog.close()
+                    progress_dialog.close()
                     
                     return records_inserted
                     
@@ -3129,7 +2853,7 @@ Source: {result.get('source', 'unknown')} database
                     )
 
                     self.progress_dialog.mark_complete()
-                    self.self.progress_dialog.close()
+                    self.progress_dialog.close()
 
                     try:
                         self.df = self.db.get_all_logs(chunk_size=10000)
@@ -3149,7 +2873,7 @@ Source: {result.get('source', 'unknown')} database
                     # Initialize default trend displays
                     QtCore.QTimer.singleShot(500, self._refresh_all_trends)
 
-                    # MPC tab initialization removed
+                    # MPC initialization removed
 
                     # Show success message only once
                     if not hasattr(self, '_import_success_shown'):
@@ -3291,6 +3015,7 @@ Source: {result.get('source', 'unknown')} database
                                 f"Data is now available in:\n"
                                 f"• Dashboard tab (system status)\n"
                                 f"• Trend tab graphs\n"
+                                f"• Data Table tab\n"
                                 f"• Analysis tab statistics"
                             )
                         else:
@@ -3338,7 +3063,7 @@ Source: {result.get('source', 'unknown')} database
                             if 'tb' in line_lower or 'halfault' in line_lower or 'hal fault' in line_lower:
                                 filtered_lines.append(line)
 
-                    self.self.progress_dialog.setValue(30)
+                    progress_dialog.setValue(30)
                     QtWidgets.QApplication.processEvents()
 
                     print(f"Filtered {len(filtered_lines)} relevant lines from file")
@@ -3350,7 +3075,7 @@ Source: {result.get('source', 'unknown')} database
                             temp_file.writelines(filtered_lines)
                             temp_path = temp_file.name
 
-                        self.progress_dialog.setValue(50)
+                        progress_dialog.setValue(50)
                         QtWidgets.QApplication.processEvents()
 
                         # Parse the filtered data
@@ -3358,13 +3083,13 @@ Source: {result.get('source', 'unknown')} database
                         parser = UnifiedParser()
                         df = parser.parse_linac_file(temp_path)
 
-                        self.progress_dialog.setValue(70)
+                        progress_dialog.setValue(70)
                         QtWidgets.QApplication.processEvents()
 
                         # Insert only the filtered data
                         records_inserted = self.db.insert_data_batch(df)
 
-                        self.progress_dialog.setValue(90)
+                        progress_dialog.setValue(90)
                         QtWidgets.QApplication.processEvents()
 
                         # Clean up temporary file
@@ -3381,8 +3106,8 @@ Source: {result.get('source', 'unknown')} database
                             parsing_stats=parsing_stats_json,
                         )
 
-                        self.progress_dialog.setValue(100)
-                        self.progress_dialog.close()
+                        progress_dialog.setValue(100)
+                        progress_dialog.close()
 
                         # Refresh data
                         try:
@@ -3397,7 +3122,7 @@ Source: {result.get('source', 'unknown')} database
                             f"Successfully imported {records_inserted:,} filtered records (TB/HALfault only).",
                         )
                     else:
-                        self.progress_dialog.close()
+                        progress_dialog.close()
                         QtWidgets.QMessageBox.information(
                             self,
                             "No Relevant Data",
@@ -3434,7 +3159,7 @@ Source: {result.get('source', 'unknown')} database
 
                             processed_bytes += len(chunk.encode('utf-8'))
                             progress = min(50, int((processed_bytes / file_size) * 50))
-                            self.self.progress_dialog.setValue(progress)
+                            self.progress_dialog.setValue(progress)
                             QtWidgets.QApplication.processEvents()
 
                             if self.progress_dialog.wasCanceled():
@@ -3448,7 +3173,7 @@ Source: {result.get('source', 'unknown')} database
                                     filtered_lines.append(line + '\n')
 
                     print(f"Filtered {len(filtered_lines)} relevant lines from large file")
-                    self.self.progress_dialog.setValue(60)
+                    self.progress_dialog.setValue(60)
                     QtWidgets.QApplication.processEvents()
 
                     if filtered_lines:
@@ -3458,7 +3183,7 @@ Source: {result.get('source', 'unknown')} database
                             temp_file.writelines(filtered_lines)
                             temp_path = temp_file.name
 
-                        self.self.progress_dialog.setValue(70)
+                        self.progress_dialog.setValue(70)
                         QtWidgets.QApplication.processEvents()
 
                         # Use existing large file processing for filtered data
@@ -3466,7 +3191,7 @@ Source: {result.get('source', 'unknown')} database
                         parser = UnifiedParser()
                         df = parser.parse_linac_file(temp_path)
 
-                        self.self.progress_dialog.setValue(85)
+                        self.progress_dialog.setValue(85)
                         QtWidgets.QApplication.processEvents()
 
                         records_inserted = self.db.insert_data_batch(df)
@@ -3485,8 +3210,8 @@ Source: {result.get('source', 'unknown')} database
                             parsing_stats=parsing_stats_json,
                         )
 
-                        self.self.progress_dialog.setValue(100)
-                        self.self.progress_dialog.close()
+                        self.progress_dialog.setValue(100)
+                        self.progress_dialog.close()
 
                         # Refresh data
                         try:
@@ -3501,7 +3226,7 @@ Source: {result.get('source', 'unknown')} database
                             f"Successfully imported {records_inserted:,} filtered records (TB/HALfault only).",
                         )
                     else:
-                        self.self.progress_dialog.close()
+                        self.progress_dialog.close()
                         QtWidgets.QMessageBox.information(
                             self,
                             "No Relevant Data",
@@ -3531,26 +3256,26 @@ Source: {result.get('source', 'unknown')} database
                         )
                         progress_dialog.setWindowModality(QtCore.Qt.WindowModal)
                         progress_dialog.setCancelButton(None)
-                        self.progress_dialog.setValue(10)
+                        progress_dialog.setValue(10)
                         progress_dialog.show()
                         QtWidgets.QApplication.processEvents()
 
                         self.db.clear_all()
 
-                        self.progress_dialog.setValue(50)
+                        progress_dialog.setValue(50)
                         QtWidgets.QApplication.processEvents()
 
                         import pandas as pd
 
                         self.df = pd.DataFrame()
 
-                        self.progress_dialog.setValue(70)
+                        progress_dialog.setValue(70)
                         QtWidgets.QApplication.processEvents()
 
                         self.load_dashboard()
 
-                        self.progress_dialog.setValue(100)
-                        self.progress_dialog.close()
+                        progress_dialog.setValue(100)
+                        progress_dialog.close()
 
                         QtWidgets.QMessageBox.information(
                             self, "Database", "Data cleared successfully."
@@ -3571,7 +3296,7 @@ Source: {result.get('source', 'unknown')} database
                     # Mark progress dialog as complete and close it
                     if hasattr(self, "progress_dialog") and self.progress_dialog:
                         self.progress_dialog.mark_complete()
-                        self.self.progress_dialog.close()
+                        self.progress_dialog.close()
                         self.progress_dialog = None
 
                     print(f"🎯 File processing finished: {records_count} records inserted")
@@ -3610,7 +3335,7 @@ Source: {result.get('source', 'unknown')} database
                         # Initialize default trend displays
                         QtCore.QTimer.singleShot(500, self._refresh_all_trends)
 
-                        # MPC tab initialization removed
+                        # MPC initialization removed
 
                         QtWidgets.QMessageBox.information(
                             self,
@@ -3645,7 +3370,7 @@ Source: {result.get('source', 'unknown')} database
                 """Handle errors during file processing"""
                 try:
                     if hasattr(self, "progress_dialog") and self.progress_dialog:
-                        self.self.progress_dialog.close()
+                        self.progress_dialog.close()
 
                     QtWidgets.QMessageBox.critical(
                         self, "Processing Error", f"An error occurred: {error_message}"

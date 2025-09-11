@@ -1,4 +1,4 @@
-# HALog - LINAC Water System Monitor Requirements
+# HALog - Professional LINAC Monitoring System Requirements
 # Version: 0.0.1
 # Date: 2025-08-22
 # Author: gobioeng.com
@@ -33,3 +33,18 @@ flake8>=3.9.0
 
 # Documentation
 sphinx>=4.0.0
+black
+flake8
+matplotlib
+numexpr
+numpy
+openpyxl
+pandas
+psutil
+PyQt5
+pyqtgraph
+pytest
+scikit-learn
+scipy
+sqlalchemy
+pyarrow

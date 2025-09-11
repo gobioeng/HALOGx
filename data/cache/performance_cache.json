@@ -1,39 +1,33 @@
 {
   "version": "1.0",
-  "created_at": "2025-09-11T11:08:05.265263",
-  "processed_data": {
-    "checksum": "65c50c43d2473ac27d47ed2f80930b47623a350cd915b317d08f021160aab774",
-    "results": {
-      "dashboard_loaded": true,
-      "data_summary": {
-        "total_records": 9588,
-        "unique_parameters": 13,
-        "unique_serials": 2,
-        "date_range": [
-          "2025-07-11 00:06:26",
-          "2025-08-21 23:27:21"
-        ],
-        "quality_distribution": [
-          {
-            "data_quality": null,
-            "count": 9588
-          }
-        ]
-      },
-      "cached_at": 1757585285.2464807
-    },
-    "processed_at": "2025-09-11T11:08:05.265263"
-  },
+  "created_at": "2025-09-11T13:20:45.852512",
+  "processed_data": {},
   "tab_cache": {
+    "tab_2": {
+      "data": {
+        "type": "data_table",
+        "updated_at": 1757593245.8525126
+      },
+      "cached_at": "2025-09-11T13:20:45.852512",
+      "cache_key": "303707b15577f54c"
+    },
+    "tab_3": {
+      "data": {
+        "type": "analysis",
+        "updated_at": 1757593246.7228968
+      },
+      "cached_at": "2025-09-11T13:20:53.935165",
+      "cache_key": "4fa6c5224f0f5af3"
+    },
     "tab_1": {
       "data": {
         "type": "trend",
-        "updated_at": 1757585289.1480904
+        "updated_at": 1757593265.920377
       },
-      "cached_at": "2025-09-11T11:08:12.928711",
-      "cache_key": "a33cd04a45fb989c"
+      "cached_at": "2025-09-11T13:21:07.559483",
+      "cache_key": "abf21f520b896a51"
     }
   },
   "last_optimization": null,
-  "last_updated": "2025-09-11T11:08:12.928711"
+  "last_updated": "2025-09-11T13:21:07.559483"
 }
