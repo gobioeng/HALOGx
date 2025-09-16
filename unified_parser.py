@@ -1124,37 +1124,51 @@ class UnifiedParser:
             # Sort by datetime
             df = df.sort_values("datetime")
 
-            # Remove duplicates
-            df = df.drop_duplicates(
-                subset=["datetime", "serial_number", "parameter_type", "statistic_type"]
-            )
+            # Fix column names for database compatibility
+            if 'parameter' in df.columns:
+                # Split parameter into base parameter and statistic type
+                parameter_types = []
+                statistic_types = []
+                
+                for param in df['parameter']:
+                    if param.endswith('_avg'):
+                        parameter_types.append(param[:-4])
+                        statistic_types.append('avg')
+                    elif param.endswith('_max'):
+                        parameter_types.append(param[:-4])
+                        statistic_types.append('max')
+                    elif param.endswith('_min'):
+                        parameter_types.append(param[:-4])
+                        statistic_types.append('min')
+                    elif param.endswith('_count'):
+                        parameter_types.append(param[:-6])
+                        statistic_types.append('count')
+                    else:
+                        parameter_types.append(param)
+                        statistic_types.append('avg')  # Default to avg
+                
+                df['parameter_type'] = parameter_types
+                df['statistic_type'] = statistic_types
+                
+                # Keep both 'param' for UI compatibility and 'parameter_type' for database
+                df['param'] = df['parameter_type']  # For UI compatibility
+                
+                # Remove original parameter column
+                df = df.drop(columns=['parameter'])
+                
+            # Add missing database columns with defaults
+            if 'count' not in df.columns:
+                df['count'] = None
+            if 'description' not in df.columns:
+                df['description'] = None
+            if 'data_quality' not in df.columns:
+                df['data_quality'] = 'good'
+            if 'raw_parameter' not in df.columns:
+                df['raw_parameter'] = df['parameter_type'] if 'parameter_type' in df.columns else None
 
-            # Create additional columns needed by database manager for compatibility
-            if 'avg_value' in df.columns:
-                # Create separate records for avg, min, max for database compatibility
-                records = []
-                for _, row in df.iterrows():
-                    base_record = row.to_dict()
-
-                    # Average record
-                    avg_record = base_record.copy()
-                    avg_record['value'] = row['avg_value']
-                    avg_record['statistic_type'] = 'avg'
-                    records.append(avg_record)
-
-                    # Min record
-                    min_record = base_record.copy()
-                    min_record['value'] = row['min_value']
-                    min_record['statistic_type'] = 'min'
-                    records.append(min_record)
-
-                    # Max record
-                    max_record = base_record.copy()
-                    max_record['value'] = row['max_value']
-                    max_record['statistic_type'] = 'max'
-                    records.append(max_record)
-
-                df = pd.DataFrame(records)
+            # Remove duplicates based on available columns
+            duplicate_columns = ["datetime", "serial_number", "parameter_type", "statistic_type"]
+            df = df.drop_duplicates(subset=duplicate_columns)
 
             # Reset index
             df = df.reset_index(drop=True)
@@ -1163,6 +1177,8 @@ class UnifiedParser:
 
         except Exception as e:
             print(f"Error cleaning data: {e}")
+            import traceback
+            traceback.print_exc()
 
         return df
 

@@ -78,3 +78,11 @@ BeamOdometers - MagFilOnTime                     | Magnetron Filament On Time   
 
 
 EMO Good Event Detected                          | EMO Good Event                     | event
+
+# Additional parameters found in samlog.txt - AI categorized for appropriate trend tabs
+cpuTemperatureSensor0                            | CPU Temperature Sensor 0          | °C
+cpuTemperatureSensor1                            | CPU Temperature Sensor 1          | °C
+COL_ADC_CHAN_24V_MON_STAT                        | COL ADC 24V Monitor                | V
+COL_ADC_CHAN_5V_MON_STAT                         | COL ADC 5V Monitor                 | V
+MLC_ADC_CHAN_24V_BANKA_MON_STAT                  | MLC Bank A 24V Monitor             | V
+MLC_ADC_CHAN_TEMP_BANKA_STAT                     | MLC Bank A Temperature             | °C

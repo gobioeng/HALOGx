@@ -1,1 +1,16 @@
-
+2025-09-07	00:05:38	Local0	Info	00:05:37:971	SN# 2182	COL	Controller	CMNSubsystemBase::logStatistics cpuTemperatureSensor0: count=7204, max=42.000000, min=42.000000, avg=42.000000
+2025-09-07	00:05:39	Local0	Info	00:05:38:982	SN# 2182	COL	Controller	CMNSubsystemBase::logStatistics cpuTemperatureSensor1: count=7204, max=36.000000, min=35.000000, avg=35.398667
+2025-09-07	00:10:25	Local0	Info	00:10:25:071	SN# 2182	STN	Controller	NDCIndexMotor::GantryRtn primSecDevStats: count=720001, max=-0.000409, min=-0.000468, avg=-0.000426
+2025-09-07	00:10:25	Local0	Info	00:10:25:232	SN# 2182	COL	Controller	NDCIndexMotor::CollRtn primSecDevStats: count=720002, max=-0.163191, min=-0.163464, avg=-0.163429
+2025-09-07	00:11:13	Local0	Info	00:11:13:032	SN# 2182	STN	Controller	STNFanCtrl::logStatistics FanremoteTempStatistics: count=72009, max=25.312500, min=24.937500, avg=25.183132
+2025-09-07	00:11:14	Local0	Info	00:11:14:044	SN# 2182	STN	Controller	STNFanCtrl::logStatistics FanhumidityStatistics: count=72010, max=30.108643, min=29.650879, avg=29.934037
+2025-09-07	00:11:15	Local0	Info	00:11:15:056	SN# 2182	STN	Controller	STNFanCtrl::logStatistics FanfanSpeed1Statistics: count=72009, max=1087.000000, min=1064.000000, avg=1073.641892
+2025-09-07	00:11:16	Local0	Info	00:11:16:067	SN# 2182	STN	Controller	STNFanCtrl::logStatistics FanfanSpeed2Statistics: count=72009, max=1307.000000, min=1242.000000, avg=1272.820397
+2025-09-07	00:15:52	Local0	Info	00:15:52:098	SN# 2182	BGM	Controller	BGMFPGASensor::logStatistics magnetronFlow: count=360091, max=6.238983, min=5.883527, avg=6.030873
+2025-09-07	00:15:53	Local0	Info	00:15:53:110	SN# 2182	BGM	Controller	BGMFPGASensor::logStatistics targetAndCirculatorFlow: count=360091, max=3.700278, min=3.529004, avg=3.616136
+2025-09-07	00:15:55	Local0	Info	00:15:55:133	SN# 2182	BGM	Controller	BGMFPGASensor::logStatistics magnetronTemp: count=360090, max=26.707408, min=26.659573, avg=26.679492
+2025-09-07	00:15:56	Local0	Info	00:15:56:144	SN# 2182	BGM	Controller	BGMFPGASensor::logStatistics targetAndCirculatorTemp: count=360090, max=26.595310, min=26.548989, avg=26.568016
+2025-09-07	00:15:00	Local0	Info	00:15:00:266	SN# 2182	COL	Controller	OperationalParamsMonitor::logStatistics COL_ADC_CHAN_24V_MON_STAT: count=360054, max=23.832550, min=23.762894, avg=23.797090
+2025-09-07	00:15:01	Local0	Info	00:15:01:282	SN# 2182	COL	Controller	OperationalParamsMonitor::logStatistics COL_ADC_CHAN_5V_MON_STAT: count=360054, max=4.950867, min=4.948730, avg=4.949626
+2025-09-07	00:15:11	Local0	Info	00:15:11:447	SN# 2182	COL	Controller	OperationalParamsMonitor::logStatistics MLC_ADC_CHAN_24V_BANKA_MON_STAT: count=360054, max=23.829192, min=23.751983, avg=23.789971
+2025-09-07	00:15:20	Local0	Info	00:15:20:592	SN# 2182	COL	Controller	OperationalParamsMonitor::logStatistics MLC_ADC_CHAN_TEMP_BANKA_STAT: count=360055, max=30.734255, min=30.474855, avg=30.605406
