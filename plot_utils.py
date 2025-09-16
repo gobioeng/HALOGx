@@ -289,23 +289,72 @@ class PlotUtils:
         }
 
     @staticmethod
-    def find_time_clusters(df_times, gap_threshold=timedelta(days=1)):
-        """Find clusters of data based on time gaps"""
+    def find_time_clusters(df_times, gap_threshold=None, auto_threshold=True):
+        """
+        Find clusters of data based on time gaps with intelligent threshold detection.
+        Fixed to handle large datasets (20+ days) without unnecessary breaks.
+        """
         if len(df_times) == 0:
             return []
         
         df_times_sorted = sorted(df_times)
+        
+        # Intelligent gap threshold calculation
+        if auto_threshold:
+            # Calculate data time span
+            total_span = df_times_sorted[-1] - df_times_sorted[0]
+            
+            # Adaptive threshold based on data span and density
+            if total_span.total_seconds() < 24*3600:  # Less than 1 day
+                default_threshold = timedelta(hours=1)
+            elif total_span.total_seconds() < 7*24*3600:  # Less than 1 week
+                default_threshold = timedelta(hours=6)
+            elif total_span.total_seconds() < 30*24*3600:  # Less than 1 month
+                default_threshold = timedelta(days=1)
+            else:  # More than 1 month - use larger threshold to prevent excessive breaks
+                default_threshold = timedelta(days=3)
+                
+            # Additional check: if we have dense data, increase threshold
+            if len(df_times_sorted) > 1000:  # Dense data
+                if total_span.total_seconds() > 20*24*3600:  # 20+ days
+                    default_threshold = timedelta(days=7)  # Prevent breaks in long datasets
+                    
+            gap_threshold = gap_threshold or default_threshold
+        else:
+            gap_threshold = gap_threshold or timedelta(days=1)
+        
         clusters = []
         current_cluster = [df_times_sorted[0]]
         
         for i in range(1, len(df_times_sorted)):
-            if df_times_sorted[i] - df_times_sorted[i-1] <= gap_threshold:
+            time_gap = df_times_sorted[i] - df_times_sorted[i-1]
+            
+            if time_gap <= gap_threshold:
                 current_cluster.append(df_times_sorted[i])
             else:
+                # Only create a new cluster if the gap is significant
+                # This prevents unnecessary breaks in continuous data
                 clusters.append(current_cluster)
                 current_cluster = [df_times_sorted[i]]
         
         clusters.append(current_cluster)
+        
+        # Post-process: merge small adjacent clusters if they're close enough
+        if len(clusters) > 1:
+            merged_clusters = [clusters[0]]
+            
+            for i in range(1, len(clusters)):
+                prev_cluster_end = max(merged_clusters[-1])
+                current_cluster_start = min(clusters[i])
+                
+                # If clusters are close (within 2x the threshold), merge them
+                if (current_cluster_start - prev_cluster_end) <= (gap_threshold * 2):
+                    merged_clusters[-1].extend(clusters[i])
+                else:
+                    merged_clusters.append(clusters[i])
+            
+            clusters = merged_clusters
+        
         return clusters
 
     @staticmethod

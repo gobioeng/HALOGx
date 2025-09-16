@@ -25,6 +25,14 @@ except ImportError:
     CACHING_AVAILABLE = False
     print("⚠️ Caching not available - fault code loading will be slower")
 
+# Import enhanced parameter mapper for better parsing
+try:
+    from enhanced_parameter_mapper import EnhancedParameterMapper
+    ENHANCED_MAPPING_AVAILABLE = True
+except ImportError:
+    ENHANCED_MAPPING_AVAILABLE = False
+    print("⚠️ Enhanced parameter mapping not available - using basic mapping")
+
 
 class UnifiedParser:
     """
@@ -45,6 +53,18 @@ class UnifiedParser:
         self.fault_codes: Dict[str, Dict[str, str]] = {}
         self.parameter_mapping = {}  # Initialize before calling _init_parameter_mapping
         self.df: Optional[pd.DataFrame] = None # Initialize df to None
+        
+        # Initialize enhanced parameter mapper to use mapedname.txt
+        if ENHANCED_MAPPING_AVAILABLE:
+            try:
+                self.enhanced_mapper = EnhancedParameterMapper()
+                print("✅ Enhanced parameter mapper initialized - using mapedname.txt for parameter mapping")
+                print(f"📊 Loaded {self.enhanced_mapper.get_mapping_statistics()['total_mappings']} parameter mappings")
+            except Exception as e:
+                print(f"⚠️ Error initializing enhanced mapper: {e}")
+                self.enhanced_mapper = None
+        else:
+            self.enhanced_mapper = None
         
         # Initialize fault code caching system for performance optimization
         if CACHING_AVAILABLE:
@@ -90,19 +110,56 @@ class UnifiedParser:
             "datetime_alt": re.compile(
                 r"(\d{1,2}/\d{1,2}/\d{4})[ \t]+(\d{1,2}:\d{2}:\d{2})"
             ),
-            # Enhanced parameter patterns - more flexible for actual log files
+            # Enhanced parameter patterns - more flexible and comprehensive
             "water_parameters": re.compile(
-                r"([a-zA-Z][a-zA-Z0-9_\s]*[a-zA-Z0-9])"  # Capture parameter name (letters, numbers, underscores, spaces)
-                r"[:\s]*count\s*=\s*(\d+),?\s*"           # count=N
-                r"max\s*=\s*([\d.-]+),?\s*"               # max=N.N
-                r"min\s*=\s*([\d.-]+),?\s*"               # min=N.N  
-                r"avg\s*=\s*([\d.-]+)",                   # avg=N.N
+                r"([a-zA-Z][a-zA-Z0-9_\s\-\.:]*[a-zA-Z0-9])"  # More flexible parameter name capture
+                r"[:\s]*(?:count\s*=\s*(\d+)[,\s]*)??"           # Optional count
+                r"(?:max\s*=\s*([\d.\-+eE]+)[,\s]*)??"           # Optional max with scientific notation support
+                r"(?:min\s*=\s*([\d.\-+eE]+)[,\s]*)??"           # Optional min with scientific notation support
+                r"(?:avg\s*=\s*([\d.\-+eE]+))??"                 # Optional avg with scientific notation support
+                r"|"  # OR alternative pattern
+                r"([a-zA-Z][a-zA-Z0-9_\s\-\.:]*[a-zA-Z0-9])"     # Alternative parameter capture
+                r"[:\s]*(?:value\s*=\s*([\d.\-+eE]+))??"         # Alternative value pattern
+                r"|"  # OR another alternative
+                r"([a-zA-Z][a-zA-Z0-9_\s\-\.:]*[a-zA-Z0-9])"     # Another parameter capture
+                r"[:\s]*(?:reading\s*=\s*([\d.\-+eE]+))??"       # Reading pattern
+                r"|"  # OR statistics pattern
+                r"([a-zA-Z][a-zA-Z0-9_\s\-\.:]*[a-zA-Z0-9])"     # Statistics parameter
+                r"[:\s]*(?:Statistics[:\s]*)??"                   # Optional Statistics keyword
+                r"(?:count\s*=\s*(\d+)[,\s]*)??"                 # Statistics count
+                r"(?:max\s*=\s*([\d.\-+eE]+)[,\s]*)??"          # Statistics max
+                r"(?:min\s*=\s*([\d.\-+eE]+)[,\s]*)??"          # Statistics min
+                r"(?:avg\s*=\s*([\d.\-+eE]+))??",               # Statistics avg
                 re.IGNORECASE,
             ),
-            # Serial number patterns
-            "serial_number": re.compile(r"SN#?\s*(\d+)", re.IGNORECASE),
+            # Serial number patterns with more variations
+            "serial_number": re.compile(r"(?:SN|S/N|Serial)[#\s]*(\d+)", re.IGNORECASE),
             "serial_alt": re.compile(r"Serial[:\s]+(\d+)", re.IGNORECASE),
             "machine_id": re.compile(r"Machine[:\s]+(\d+)", re.IGNORECASE),
+            
+            # Additional patterns for better parameter extraction
+            "parameter_with_units": re.compile(
+                r"([a-zA-Z][a-zA-Z0-9_\s\-\.]*)"               # Parameter name
+                r"[:\s]*"                                       # Separator
+                r"([\d.\-+eE]+)"                               # Value
+                r"\s*"                                          # Optional space
+                r"([a-zA-Z%°/]+)??"                            # Optional unit
+                r"\s*"                                          # Optional space
+                r"(?:\(([^)]+)\))??"                           # Optional description in parentheses
+                , re.IGNORECASE
+            ),
+            
+            # Enhanced logStatistics pattern
+            "log_statistics": re.compile(
+                r"logStatistics\s+"                            # logStatistics prefix
+                r"([a-zA-Z][a-zA-Z0-9_\s\-\.]*)"              # Parameter name
+                r"[:\s]*"                                       # Separator
+                r"count\s*=\s*(\d+)[,\s]*"                     # count
+                r"max\s*=\s*([\d.\-+eE]+)[,\s]*"              # max
+                r"min\s*=\s*([\d.\-+eE]+)[,\s]*"              # min
+                r"avg\s*=\s*([\d.\-+eE]+)",                   # avg
+                re.IGNORECASE
+            )
         }
 
     def _init_parameter_mapping(self):
@@ -490,7 +547,7 @@ class UnifiedParser:
         return self._process_chunk_optimized(chunk_lines)
 
     def _process_chunk_optimized(self, chunk_lines: List[Tuple[int, str]]) -> List[Dict]:
-        """Optimized chunk processing with reduced function calls and early filtering"""
+        """Optimized chunk processing with enhanced data extraction"""
         records = []
 
         # Pre-compile frequently used patterns for this chunk
@@ -501,8 +558,14 @@ class UnifiedParser:
 
         for line_number, line in chunk_lines:
             try:
-                # Early filtering - skip lines that clearly don't contain parameters
-                if 'count=' not in line or 'avg=' not in line:
+                # Enhanced filtering - look for more patterns, not just count= and avg=
+                # This addresses the issue of extracting too few data points
+                has_statistics = any(keyword in line.lower() for keyword in [
+                    'count=', 'avg=', 'statistics', 'stat', 'max=', 'min=', 
+                    'value=', 'reading=', 'measurement='
+                ])
+                
+                if not has_statistics:
                     continue
 
                 parsed_records = self._parse_line_optimized(line, line_number, 
@@ -637,10 +700,18 @@ class UnifiedParser:
         return self.pattern_to_unified.get(lookup_key, cleaned_param.strip())
 
     def _normalize_parameter_name_cached(self, param_name: str) -> str:
-        """Cached version of parameter normalization with exact pattern matching"""
+        """Cached version of parameter normalization using enhanced mapper when available"""
         if param_name in self._param_cache:
             return self._param_cache[param_name]
 
+        # Use enhanced parameter mapper if available
+        if self.enhanced_mapper:
+            mapping = self.enhanced_mapper.map_parameter_name(param_name)
+            unified_name = mapping['friendly_name']
+            self._param_cache[param_name] = unified_name
+            return unified_name
+
+        # Fallback to original logic
         # Clean parameter name - remove logStatistics prefix if present
         cleaned_param = param_name.strip()
         if cleaned_param.lower().startswith('logstatistics '):
@@ -667,7 +738,13 @@ class UnifiedParser:
         return result
 
     def _is_target_parameter(self, param_name: str) -> bool:
-        """Check if parameter is one of the comprehensive target parameters"""
+        """Check if parameter is one we should extract using enhanced mapper when available"""
+        
+        # Use enhanced parameter mapper if available
+        if self.enhanced_mapper:
+            return self.enhanced_mapper.is_target_parameter(param_name)
+        
+        # Fallback to original logic with expanded keywords
         # Clean parameter name - remove logStatistics prefix if present
         cleaned_param = param_name
         if cleaned_param.lower().startswith('logstatistics '):
@@ -675,7 +752,7 @@ class UnifiedParser:
 
         param_lower = cleaned_param.lower().replace(" ", "").replace(":", "").replace("_", "")
 
-        # Comprehensive target keywords for all parameter types
+        # Expanded target keywords to extract more data points
         target_keywords = [
             # Fan and speed parameters
             'fanremotetemp', 'fanhumidity', 'fanfanspeed', 'fanspeed', 'fan',
@@ -683,6 +760,7 @@ class UnifiedParser:
             # Water system parameters
             'magnetronflow', 'targetandcirculatorflow', 'citywaterflow',
             'pumpressure', 'waterflow', 'flow', 'pump', 'chiller', 'watertank',
+            'cooling', 'temperature', 'temp',
 
             # Temperature parameters  
             'magnetrontemp', 'colboardtemp', 'pdutemp', 'watertanktemp',
@@ -691,13 +769,19 @@ class UnifiedParser:
             # Voltage parameters
             'mlc_adc_chan_temp_banka', 'mlc_adc_chan_temp_bankb',
             'col_adc_chan_temp', 'voltage', 'volt', '24v', '48v', '5v',
-            'banka', 'bankb', 'adc', 'mlc', 'col',
+            'banka', 'bankb', 'adc', 'mlc', 'col', 'enc', 'srv', 'mon',
 
             # Humidity parameters
             'humidity', 'humid',
 
             # Pressure parameters
-            'pressure', 'psi', 'bar'
+            'pressure', 'psi', 'bar', 'sf6', 'gas',
+            
+            # Additional parameters based on mapedname.txt
+            'proximal', 'distal', 'analog', 'digital', 'supply', 'reference',
+            'vref', 'gantry', 'collimator', 'drift', 'deviation', 'afc',
+            'motor', 'beam', 'odometer', 'arc', 'count', 'time', 'emo',
+            'event', 'statistics', 'stat', 'index', 'ndc'
         ]
 
         # Check if any target keyword is in the parameter name
