@@ -1727,7 +1727,26 @@ Source: {result.get('source', 'unknown')} database
                         dt_max = self.df["datetime"].max()
                         duration = dt_max - dt_min
 
-                        self.ui.lblDuration.setText(f"Duration: {duration}")
+                        # Format duration properly to show days, hours, minutes
+                        def format_duration(td):
+                            """Format timedelta to show days, hours, minutes"""
+                            if pd.isna(td):
+                                return "No data"
+                            
+                            total_seconds = int(td.total_seconds())
+                            days = total_seconds // 86400
+                            hours = (total_seconds % 86400) // 3600
+                            minutes = (total_seconds % 3600) // 60
+                            
+                            if days > 0:
+                                return f"{days} days, {hours} hours, {minutes} minutes"
+                            elif hours > 0:
+                                return f"{hours} hours, {minutes} minutes"
+                            else:
+                                return f"{minutes} minutes"
+
+                        formatted_duration = format_duration(duration)
+                        self.ui.lblDuration.setText(f"Duration: {formatted_duration}")
                         self.ui.lblRecordCount.setText(
                             f"Total Records: {len(self.df):,}"
                         )
