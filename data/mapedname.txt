@@ -11,19 +11,13 @@ CoolingpumpHighStatistics                        | Water Pump Pressure          
 CoolingcityWaterTempStatistics                   | City water flow		      |l/m
 CoolingtargetFlowLowStatistics			 | Target & Circulator Flow	      |l/m
 CoolingmagnetronFlowLowStatistics                | Magnetron Flow                     | L/min
+MLC_ADC_CHAN_TEMP_BANKA_STAT                     | MLC Temperature Bank A             | °C
+MLC_ADC_CHAN_TEMP_BANKB_STAT                     | MLC Temperature Bank B             | °C
+COL_BOARD_TEMP_MON_STAT                          | COL Board Temperature              | °C
 
-COL_ADC_CHAN_SRV_ENC_3_3V_MON_STAT               | Encoder 3.3V Supply                | V
-COL_ADC_CHAN_M48V_MON_STAT                       | Main -48V Supply                   | V
-COL_ADC_CHAN_M15V_MON_STAT                       | Main -15V Supply                   | V
-COL_ADC_CHAN_M11V_MON_STAT                       | Main -11V Supply                   | V
-COL_ADC_CHAN_24V_MON_STAT                        | Main 24V Supply                    | V
-COL_ADC_CHAN_5V_MON_STAT                         | Main 5V Supply                     | V
-COL_ADC_CHAN_3_3V_MON_STAT                       | Main 3.3V Supply                   | V
-COL_ADC_CHAN_1_2V_MON_STAT                       | Main 1.2V Supply                   | V
-COL_ADC_CHAN_5VA_MON_STAT                        | Analog 5V Supply                   | V
-COL_ADC_CHAN_VREF2500_MON_STAT                   | 2.5V Reference Voltage             | V
-COL_ADC_CHAN_VREF2V5_HI_MON_STAT                 | 2.5V Reference High                | V
-COL_ADC_CHAN_VREF2V5_LO_MON_STAT                 | 2.5V Reference Low                 | V
+
+
+
 MLC_ADC_CHAN_PROXIMAL_10V_BANKA_MON_STAT         | MLC Proximal 10V Bank A            | V
 MLC_ADC_CHAN_PROXIMAL_10V_BANKB_MON_STAT         | MLC Proximal 10V Bank B            | V
 MLC_ADC_CHAN_DISTAL_10V_BANKA_MON_STAT           | MLC Distal 10V Bank A              | V
@@ -42,15 +36,12 @@ MLC_ADC_CHAN_3_3V_BANKA_MON_STAT                 | MLC 3.3V Bank A              
 MLC_ADC_CHAN_3_3V_BANKB_MON_STAT                 | MLC 3.3V Bank B                    | V
 MLC_ADC_CHAN_1_2V_BANKA_MON_STAT                 | MLC 1.2V Bank A                    | V
 MLC_ADC_CHAN_1_2V_BANKB_MON_STAT                 | MLC 1.2V Bank B                    | V
-MLC_ADC_CHAN_TEMP_BANKA_STAT                     | MLC Temperature Bank A             | °C
-MLC_ADC_CHAN_TEMP_BANKB_STAT                     | MLC Temperature Bank B             | °C
+
 MLC_ADC_CHAN_M48V_BANKA_MON_STAT                 | MLC -48V Bank A                    | V
 MLC_ADC_CHAN_M48V_BANKB_MON_STAT                 | MLC -48V Bank B                    | V
 
 
-ionAnalogN11V                                    | Ion Analog -11V                    | V
-ionAnalogN5V                                     | Ion Analog -5V                     | V
-ionAnalogP5V                                     | Ion Analog +5V                     | V
+
 
 onBoardAnalogN12V                                | Onboard Analog -12V                | V
 onBoardAnalogN5V                                 | Onboard Analog -5V                 | V
@@ -59,7 +50,7 @@ onBoardAnalogP12V                                | Onboard Analog +12V          
 onBoardAnalogP3V                                 | Onboard Analog +3V                 | V
 onBoardAnalogP5V                                 | Onboard Analog +5V                 | V
 onBoardDigitalP5V                                | Onboard Digital +5V                | V
-COL_BOARD_TEMP_MON_STAT                          | COL Board Temperature              | °C
+
 
 
 FanremoteTempStatistics                          | Room Temperature             | °C
