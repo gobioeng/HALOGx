@@ -1,33 +1,17 @@
 {
   "version": "1.0",
-  "created_at": "2025-09-11T13:20:45.852512",
+  "created_at": "2025-09-16T14:42:58.544170",
   "processed_data": {},
   "tab_cache": {
-    "tab_2": {
-      "data": {
-        "type": "data_table",
-        "updated_at": 1757593245.8525126
-      },
-      "cached_at": "2025-09-11T13:20:45.852512",
-      "cache_key": "303707b15577f54c"
-    },
-    "tab_3": {
-      "data": {
-        "type": "analysis",
-        "updated_at": 1757593246.7228968
-      },
-      "cached_at": "2025-09-11T13:20:53.935165",
-      "cache_key": "4fa6c5224f0f5af3"
-    },
     "tab_1": {
       "data": {
         "type": "trend",
-        "updated_at": 1757593265.920377
+        "updated_at": 1758030177.0363226
       },
-      "cached_at": "2025-09-11T13:21:07.559483",
-      "cache_key": "abf21f520b896a51"
+      "cached_at": "2025-09-16T14:42:58.544170",
+      "cache_key": "60240084e6263e4f"
     }
   },
   "last_optimization": null,
-  "last_updated": "2025-09-11T13:21:07.559483"
+  "last_updated": "2025-09-16T14:42:58.545180"
 }

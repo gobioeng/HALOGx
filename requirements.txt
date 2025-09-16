@@ -48,3 +48,13 @@ scikit-learn
 scipy
 sqlalchemy
 pyarrow
+matplotlib
+numexpr
+numpy
+openpyxl
+pandas
+PyQt5
+pyqtgraph
+scikit-learn
+scipy
+sqlalchemy

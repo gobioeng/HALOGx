@@ -1,0 +1,10 @@
+{
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "executionEnvironments": [
+    { 
+      "root": ".", 
+      "extraPaths": [ ".pythonlibs/lib/python3.11/site-packages" ] 
+    }
+  ]
+}
