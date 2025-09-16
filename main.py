@@ -177,13 +177,19 @@ class HALogApp:
                 self.status_label.setText(message)
 
     def create_main_window(self):
-        """Create professional main application window"""
+        """Create professional main application window with optimized startup"""
         start_window = time.time()
         QtWidgets = lazy_import("PyQt5.QtWidgets")
         QtCore = lazy_import("PyQt5.QtCore")
         QtGui = lazy_import("PyQt5.QtGui")
 
-        self.update_splash_progress(30, "Loading interface...")
+        self.update_splash_progress(30, "Optimizing startup components...")
+        
+        # Initialize startup optimizer for faster loading
+        from startup_optimizer import initialize_optimized_startup
+        startup_optimizer = initialize_optimized_startup()
+
+        self.update_splash_progress(35, "Loading interface...")
 
         # Import resources first to ensure icon is available
         try:
@@ -266,6 +272,15 @@ class HALogApp:
                     # Initialize unified parser for fault codes and other data
                     from unified_parser import UnifiedParser
                     self.fault_parser = UnifiedParser()
+                    
+                    # Initialize optimized parser for faster data processing using precompiled components
+                    if startup_optimizer and startup_optimizer.is_optimized_startup():
+                        self.optimized_parser = startup_optimizer.get_precompiled_parser()
+                        print("✓ Using precompiled optimized parser for maximum performance")
+                    else:
+                        from optimized_parser import get_optimized_parser
+                        self.optimized_parser = get_optimized_parser()
+                        print("✓ Optimized parser initialized")
 
                     # Initialize fault notes manager
                     from fault_notes_manager import FaultNotesManager
@@ -328,6 +343,11 @@ class HALogApp:
                     startup_time = time.time() - startup_begin
                     self.performance_manager.record_startup_time(startup_time)
                     
+                    # Get startup optimizer if available
+                    startup_optimizer = None
+                    if hasattr(self, '_startup_optimizer'):
+                        startup_optimizer = self._startup_optimizer
+                    
                     # Check if data reprocessing is needed
                     data_sources = [
                         os.path.join(os.path.dirname(__file__), 'data', 'HALfault.txt'),
@@ -354,9 +374,14 @@ class HALogApp:
                     
                     self._dashboard_loaded = True
                     
-                    # Display performance report
+                    # Display performance report including optimization details
                     performance_report = self.performance_manager.get_startup_report()
                     print(performance_report)
+                    
+                    # If startup optimizer was used, also display its report
+                    if startup_optimizer:
+                        optimizer_report = startup_optimizer.get_startup_report()
+                        print(optimizer_report)
                     
                 except Exception as e:
                     print(f"Error during deferred initialization: {e}")
@@ -854,67 +879,66 @@ class HALogApp:
                     print(f"Error initializing fault code tab: {e}")
 
             def _initialize_trend_controls(self):
-                """Initialize the trend controls with available parameters from database"""
+                """Initialize the trend controls with available parameters using optimized hardcoded mappings"""
                 try:
-                    if not hasattr(self, 'df') or self.df.empty:
-                        print("⚠️ No database data available for trend controls")
-                        return
-
-                    # Get unique serial numbers from database
-                    if 'serial_number' in self.df.columns:
-                        serial_numbers = sorted(list(set(self.df['serial_number'].astype(str).unique())))
-                    elif 'serial' in self.df.columns:
-                        serial_numbers = sorted(list(set(self.df['serial'].astype(str).unique())))
-                    elif 'Serial' in self.df.columns:
-                        serial_numbers = sorted(list(set(self.df['Serial'].astype(str).unique())))
+                    # Check if startup optimizer provided precompiled trend data
+                    precompiled_trend_data = None
+                    if hasattr(self, '_startup_optimizer'):
+                        precompiled_trend_data = self._startup_optimizer.optimize_trend_initialization()
+                    
+                    if precompiled_trend_data:
+                        print("🚀 Using precompiled trend data for maximum startup performance")
+                        
+                        # Use precompiled data directly
+                        flow_params = precompiled_trend_data["flow_parameters"]
+                        voltage_params = precompiled_trend_data["voltage_parameters"]
+                        temp_params = precompiled_trend_data["temperature_parameters"]
+                        humidity_params = precompiled_trend_data["humidity_parameters"]
+                        fan_params = precompiled_trend_data["fan_parameters"]
+                        
                     else:
-                        serial_numbers = ['All']
-
-                    # Get all available parameters from database
-                    param_column = None
-                    possible_param_columns = ['parameter_type', 'param', 'Parameter']
-                    for col in possible_param_columns:
-                        if col in self.df.columns:
-                            param_column = col
-                            break
-
-                    if not param_column:
-                        print(f"⚠️ No parameter column found. Available columns: {list(self.df.columns)}")
-                        return
-
-                    all_params = list(self.df[param_column].unique())
-                    print(f"🔧 Initializing trend controls with {len(all_params)} parameters")
-                    print(f"🔧 Sample parameters: {all_params[:5]}")
-
-                    # Since your data shows COL parameters, let's categorize them properly
-                    flow_params = []
-                    voltage_params = []
-                    temp_params = []
-                    humidity_params = []
-                    fan_params = []
-
-                    for param in all_params:
-                        param_str = str(param)
-                        param_lower = param_str.lower()
-
-                        # For COL parameters, categorize them as voltage by default
-                        if param_str.upper().startswith('COL'):
-                            voltage_params.append(param)
-                        elif any(keyword in param_lower for keyword in ['flow', 'pump', 'water', 'magnetron']):
-                            flow_params.append(param)
-                        elif any(keyword in param_lower for keyword in ['volt', '_v_', '24v', '48v', '5v', 'bank', 'adc']):
-                            voltage_params.append(param)
-                        elif any(keyword in param_lower for keyword in ['temp', 'temperature']):
-                            temp_params.append(param)
-                        elif any(keyword in param_lower for keyword in ['humidity', 'humid']):
-                            humidity_params.append(param)
-                        elif any(keyword in param_lower for keyword in ['fan', 'speed']):
-                            fan_params.append(param)
-                        else:
-                            # Default unknown parameters to voltage category for display
-                            voltage_params.append(param)
-
-                    # Populate dropdown controls with actual parameters
+                        # Fallback to runtime optimization
+                        print("🔧 Initializing trend controls with runtime optimization")
+                        
+                        # Use optimized parser for faster parameter categorization
+                        if not hasattr(self, 'optimized_parser'):
+                            from optimized_parser import get_optimized_parser
+                            self.optimized_parser = get_optimized_parser()
+                        
+                        # Get parameter categories from hardcoded mapper for fast initialization
+                        categories = self.optimized_parser.get_parameter_categories()
+                        print(f"🔧 Processing {len(categories)} parameter categories")
+                        
+                        # Get parameters by category using optimized mapper
+                        flow_params = []
+                        voltage_params = []
+                        temp_params = []
+                        humidity_params = []
+                        fan_params = []
+                        
+                        # Use hardcoded parameter mappings for fast categorization
+                        for category in categories:
+                            category_params = self.optimized_parser.get_category_parameters(category)
+                            
+                            for param_info in category_params:
+                                friendly_name = param_info["friendly_name"]
+                                
+                                if category == "water_system":
+                                    flow_params.append(friendly_name)
+                                elif category in ["mlc_voltage", "col_voltage", "power_supply"]:
+                                    voltage_params.append(friendly_name)
+                                elif category in ["temperature", "mlc_temperature", "col_temperature"]:
+                                    temp_params.append(friendly_name)
+                                elif category == "humidity":
+                                    humidity_params.append(friendly_name)
+                                elif category == "fan_speed":
+                                    fan_params.append(friendly_name)
+                    
+                    # If we have database data, supplement with actual available parameters
+                    if hasattr(self, 'df') and not self.df.empty:
+                        self._supplement_with_database_parameters(flow_params, voltage_params, temp_params, humidity_params, fan_params)
+                    
+                    # Populate dropdown controls with optimized parameter lists
                     dropdown_configs = [
                         ('comboWaterTopGraph', flow_params),
                         ('comboWaterBottomGraph', flow_params),
@@ -934,25 +958,61 @@ class HALogApp:
                             combo.clear()
                             combo.addItem("Select parameter...")
                             if params:
-                                # Use simplified names for display - show all parameters
-                                for param in params:
-                                    display_name = self._get_display_name_for_param(param)
-                                    combo.addItem(display_name)
+                                for param in sorted(params):
+                                    combo.addItem(param)
 
-                    print(f"✓ Trend controls populated:")
+                    print(f"✓ Optimized trend controls populated:")
                     print(f"  - Flow parameters: {len(flow_params)}")
                     print(f"  - Voltage parameters: {len(voltage_params)}")
                     print(f"  - Temperature parameters: {len(temp_params)}")
                     print(f"  - Humidity parameters: {len(humidity_params)}")
                     print(f"  - Fan parameters: {len(fan_params)}")
 
-                    # Initialize default trend graphs after controls are setup
+                    # Initialize default trend displays after controls are setup
                     QtCore.QTimer.singleShot(200, self._initialize_default_trend_displays)
 
                 except Exception as e:
-                    print(f"Error initializing trend controls: {e}")
+                    print(f"Error initializing optimized trend controls: {e}")
                     import traceback
                     traceback.print_exc()
+            
+            def _supplement_with_database_parameters(self, flow_params, voltage_params, temp_params, humidity_params, fan_params):
+                """Supplement hardcoded parameters with actual database parameters for completeness"""
+                try:
+                    # Get unique parameters from database  
+                    param_column = None
+                    possible_param_columns = ['parameter_type', 'param', 'Parameter']
+                    for col in possible_param_columns:
+                        if col in self.df.columns:
+                            param_column = col
+                            break
+
+                    if param_column:
+                        db_params = list(self.df[param_column].unique())
+                        
+                        # Use optimized parameter mapper to categorize database parameters
+                        for param in db_params:
+                            param_info = self.optimized_parser.parameter_mapper.get_parameter_info(param)
+                            if param_info:
+                                friendly_name = param_info["friendly_name"]
+                                category = param_info["category"]
+                                
+                                # Add to appropriate category if not already present
+                                if category == "water_system" and friendly_name not in flow_params:
+                                    flow_params.append(friendly_name)
+                                elif category in ["mlc_voltage", "col_voltage", "power_supply"] and friendly_name not in voltage_params:
+                                    voltage_params.append(friendly_name)
+                                elif category in ["temperature", "mlc_temperature", "col_temperature"] and friendly_name not in temp_params:
+                                    temp_params.append(friendly_name)
+                                elif category == "humidity" and friendly_name not in humidity_params:
+                                    humidity_params.append(friendly_name)
+                                elif category == "fan_speed" and friendly_name not in fan_params:
+                                    fan_params.append(friendly_name)
+                        
+                        print(f"✓ Database parameters integrated with hardcoded mappings")
+                
+                except Exception as e:
+                    print(f"Warning: Could not supplement with database parameters: {e}")
 
             def _get_display_name_for_param(self, param_name):
                 """Convert raw parameter name to user-friendly display name"""
@@ -1139,9 +1199,20 @@ class HALogApp:
                     traceback.print_exc()
 
             def _get_parameter_data_by_description(self, parameter_description):
-                """Optimized parameter data retrieval with caching and minimal logging"""
+                """Optimized parameter data retrieval using hardcoded mappings"""
                 try:
                     if not hasattr(self, 'df') or self.df.empty:
+                        return pd.DataFrame()
+
+                    # Use optimized parser's parameter mapper for fast lookup
+                    if not hasattr(self, 'optimized_parser'):
+                        from optimized_parser import get_optimized_parser
+                        self.optimized_parser = get_optimized_parser()
+                    
+                    # Get parameter info from hardcoded mapper
+                    param_info = self.optimized_parser.parameter_mapper.get_parameter_info(parameter_description)
+                    if not param_info:
+                        print(f"⚠️ Parameter '{parameter_description}' not found in hardcoded mappings")
                         return pd.DataFrame()
 
                     # Cache parameter column lookup
@@ -1158,50 +1229,30 @@ class HALogApp:
                     if not param_column:
                         return pd.DataFrame()
 
-                    # Cache available parameters 
-                    if not hasattr(self, '_all_params_cache'):
-                        self._all_params_cache = self.df[param_column].unique()
-
-                    all_params = self._all_params_cache
-
-                    # Cache parameter mapping for faster lookups
-                    if not hasattr(self, '_param_mapping_cache'):
-                        self._param_mapping_cache = {
-                            "Mag Flow": "magnetronFlow",
-                            "Flow Target": "targetAndCirculatorFlow", 
-                            "Flow Chiller Water": "cityWaterFlow",
-                            "Temp Room": "FanremoteTempStatistics",
-                            "Room Humidity": "FanhumidityStatistics", 
-                            "Temp Magnetron": "magnetronTemp",
-                            "Temp COL Board": "COLboardTemp",
-                            "Temp PDU": "PDUTemp",
-                            "MLC Bank A 24V": "MLC_ADC_CHAN_TEMP_BANKA_STAT_24V",
-                            "MLC Bank B 24V": "MLC_ADC_CHAN_TEMP_BANKB_STAT_24V",
-                            "MLC Bank A 48V": "MLC_ADC_CHAN_TEMP_BANKA_STAT_48V",
-                            "MLC Bank B 48V": "MLC_ADC_CHAN_TEMP_BANKB_STAT_48V",
-                            "COL 24V Monitor": "COL_ADC_CHAN_TEMP_24V_MON",
-                            "Speed FAN 1": "FanfanSpeed1Statistics",
-                            "Speed FAN 2": "FanfanSpeed2Statistics",
-                            "Speed FAN 3": "FanfanSpeed3Statistics", 
-                            "Speed FAN 4": "FanfanSpeed4Statistics",
-                        }
-
-                    # Fast parameter lookup
-                    target_param = self._param_mapping_cache.get(parameter_description)
-                    selected_param = None
-
-                    if target_param and target_param in all_params:
-                        selected_param = target_param
+                    # Try to find parameter using friendly name first
+                    friendly_name = param_info["friendly_name"]
+                    
+                    # Check if we have a friendly_name column in data
+                    if 'friendly_name' in self.df.columns:
+                        param_data = self.df[self.df['friendly_name'] == friendly_name]
                     else:
-                        # Fallback to first available parameter
-                        if len(all_params) > 0:
-                            selected_param = all_params[0]
+                        # Fall back to pattern matching with parameter names
+                        patterns = param_info.get("patterns", [])
+                        param_data = pd.DataFrame()
+                        
+                        for pattern in patterns:
+                            # Try exact match first
+                            exact_match = self.df[self.df[param_column].str.lower() == pattern.lower()]
+                            if not exact_match.empty:
+                                param_data = exact_match
+                                break
+                            
+                            # Try partial match
+                            partial_match = self.df[self.df[param_column].str.lower().str.contains(pattern.lower(), na=False)]
+                            if not partial_match.empty:
+                                param_data = partial_match
+                                break
 
-                    if not selected_param:
-                        return pd.DataFrame()
-
-                    # Fast data filtering with minimal processing
-                    param_data = self.df[self.df[param_column] == selected_param]
                     if param_data.empty:
                         return pd.DataFrame()
 
@@ -1210,22 +1261,25 @@ class HALogApp:
                     if value_column not in param_data.columns:
                         return pd.DataFrame()
 
-                    # Minimal result preparation
+                    # Optimized result preparation
                     result_df = pd.DataFrame({
                         'datetime': param_data['datetime'],
                         'avg': param_data[value_column],
-                        'parameter_name': [parameter_description] * len(param_data)
+                        'parameter_name': [friendly_name] * len(param_data)
                     })
 
                     # Add min/max if available
-                    if 'Min' in param_data.columns:
-                        result_df['min_value'] = param_data['Min']
-                    if 'Max' in param_data.columns:
-                        result_df['max_value'] = param_data['Max']
+                    if 'min' in param_data.columns or 'Min' in param_data.columns:
+                        min_col = 'min' if 'min' in param_data.columns else 'Min'
+                        result_df['min_value'] = param_data[min_col]
+                    if 'max' in param_data.columns or 'Max' in param_data.columns:
+                        max_col = 'max' if 'max' in param_data.columns else 'Max'
+                        result_df['max_value'] = param_data[max_col]
 
                     return result_df.sort_values('datetime')
 
                 except Exception as e:
+                    print(f"Error retrieving parameter data for '{parameter_description}': {e}")
                     return pd.DataFrame()
 
             def _get_multi_machine_parameter_data(self, parameter_description):
@@ -2750,29 +2804,41 @@ Source: {result.get('source', 'unknown')} database
                     print(f"Error showing success message: {e}")
 
             def _import_small_file_single(self, file_path):
-                """Import single small log file and return record count - simplified"""
+                """Import single small log file and return record count - optimized"""
                 try:
-                    from unified_parser import UnifiedParser
-                    parser = UnifiedParser()
+                    print(f"📊 Parsing {os.path.basename(file_path)} with optimized parser...")
                     
-                    print(f"Parsing {os.path.basename(file_path)}...")
-                    df = parser.parse_linac_file(file_path)
+                    # Use optimized parser for faster processing
+                    df = self.optimized_parser.parse_log_file_optimized(file_path)
                     
                     if df.empty:
                         print(f"No valid data found in {os.path.basename(file_path)}")
                         return 0
                     
-                    print(f"✓ Data cleaned: {len(df)} records ready for database")
+                    # Validate data quality
+                    validation = self.optimized_parser.validate_parameter_data(df)
+                    print(f"✓ Data validation: {validation['total_records']} records, {validation['unique_parameters']} parameters")
+                    
+                    # Insert data using optimized batch processing
                     records_inserted = self.db.insert_data_batch(df)
+                    
+                    # Get processing stats for metadata
+                    stats = self.optimized_parser.get_processing_stats()
+                    parsing_stats = {
+                        "processing_time": stats["processing_time"],
+                        "records_per_sec": stats["parameters_extracted"] / max(stats["processing_time"], 0.001),
+                        "validation": validation
+                    }
                     
                     # Insert file metadata
                     self.db.insert_file_metadata(
                         filename=os.path.basename(file_path),
                         file_size=os.path.getsize(file_path),
                         records_imported=records_inserted,
-                        parsing_stats="{}",
+                        parsing_stats=str(parsing_stats),
                     )
                     
+                    print(f"✓ Performance: {parsing_stats['records_per_sec']:.1f} records/sec")
                     return records_inserted
                     
                 except Exception as e:
@@ -2780,50 +2846,51 @@ Source: {result.get('source', 'unknown')} database
                     return 0
 
             def _import_large_file_single(self, file_path, file_size):
-                """Import single large log file and return record count"""
+                """Import single large log file and return record count - optimized"""
                 try:
-                    from unified_parser import UnifiedParser
-                    parser = UnifiedParser()
+                    print(f"📊 Parsing large file {os.path.basename(file_path)} with optimized parser...")
                     
-                    print(f"Parsing large file {os.path.basename(file_path)}...")
-                    df = parser.parse_linac_file(file_path, chunk_size=5000)
+                    # Use optimized parser with larger chunk size for big files
+                    df = self.optimized_parser.parse_log_file_optimized(file_path, chunk_size=10000)
                     
                     if df.empty:
                         print(f"No valid data found in {os.path.basename(file_path)}")
                         return 0
                     
-                    print(f"✓ Data cleaned: {len(df)} records ready for database")
+                    # Validate data quality
+                    validation = self.optimized_parser.validate_parameter_data(df)
+                    print(f"✓ Data validation: {validation['total_records']} records, {validation['unique_parameters']} parameters")
                     
                     # Insert data in optimized batches with timing
                     import time
                     start_time = time.time()
-                    records_inserted = self.db.insert_data_batch(df, batch_size=500)
+                    records_inserted = self.db.insert_data_batch(df, batch_size=1000)
                     end_time = time.time()
                     
                     # Calculate and display performance metrics
                     duration = end_time - start_time
                     records_per_sec = records_inserted / duration if duration > 0 else 0
                     
-                    print(f"Batch insert completed: {records_inserted} records in {duration:.2f}s ({records_per_sec:.1f} records/sec)")
+                    # Get processing stats
+                    stats = self.optimized_parser.get_processing_stats()
+                    parsing_stats = {
+                        "processing_time": stats["processing_time"],
+                        "parsing_records_per_sec": stats["parameters_extracted"] / max(stats["processing_time"], 0.001),
+                        "db_insert_time": duration,
+                        "db_records_per_sec": records_per_sec,
+                        "validation": validation
+                    }
+                    
+                    print(f"✓ Optimized batch insert: {records_inserted} records in {duration:.2f}s ({records_per_sec:.1f} records/sec)")
+                    print(f"✓ Total parsing performance: {parsing_stats['parsing_records_per_sec']:.1f} records/sec")
                     
                     # Insert file metadata
-                    progress_dialog.update_progress(95, "Saving metadata...")
-                    QtWidgets.QApplication.processEvents()
-                    
-                    filename = os.path.basename(file_path)
-                    parsing_stats_json = "{}"
                     self.db.insert_file_metadata(
-                        filename=filename,
+                        filename=os.path.basename(file_path),
                         file_size=file_size,
                         records_imported=records_inserted,
-                        parsing_stats=parsing_stats_json,
+                        parsing_stats=str(parsing_stats),
                     )
-                    
-                    if hasattr(self, 'progress_dialog') and self.progress_dialog:
-                        self.progress_dialog.mark_complete()
-                    QtWidgets.QApplication.processEvents()
-                    if hasattr(self, 'progress_dialog') and self.progress_dialog:
-                        self.progress_dialog.close()
                     
                     return records_inserted
                     
