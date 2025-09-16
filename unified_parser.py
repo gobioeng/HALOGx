@@ -1521,6 +1521,14 @@ class UnifiedParser:
     def convert_short_data_to_dataframe(self, parsed_data):
         """Convert parsed short data to DataFrame format for analysis"""
         try:
+            # Check if parsed_data is already a DataFrame (from parse_linac_file)
+            if isinstance(parsed_data, pd.DataFrame):
+                if parsed_data.empty:
+                    print("⚠️ Empty DataFrame provided")
+                    return pd.DataFrame()
+                return parsed_data
+            
+            # Handle legacy dict format
             if not parsed_data or not parsed_data.get('success'):
                 print("⚠️ No valid parsed data to convert")
                 return pd.DataFrame()
