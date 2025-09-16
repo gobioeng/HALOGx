@@ -1,13 +1,144 @@
 #!/usr/bin/env python3
 """
-Simple test script to verify the tab-separated parser works
+Test the unified parser with the samlog.txt file to verify data extraction
 """
 
 import sys
 import os
-sys.path.append('.')
+import pandas as pd
+from pathlib import Path
 
-from unified_parser import UnifiedParser
+# Add current directory to path
+sys.path.insert(0, str(Path(__file__).parent))
+
+def test_parser_with_samlog():
+    """Test the unified parser with samlog.txt"""
+    print("🧪 Testing Unified Parser with samlog.txt")
+    print("=" * 50)
+    
+    try:
+        from unified_parser import UnifiedParser
+        
+        # Initialize parser
+        parser = UnifiedParser()
+        print("✓ UnifiedParser initialized")
+        
+        # Parse the samlog.txt file
+        samlog_path = "samlog.txt"
+        if not os.path.exists(samlog_path):
+            print(f"❌ samlog.txt not found at {samlog_path}")
+            return False
+            
+        print(f"📂 Parsing {samlog_path}...")
+        df = parser.parse_linac_file(samlog_path)
+        
+        print(f"📊 Parser Results:")
+        print(f"   Records extracted: {len(df)}")
+        
+        if len(df) > 0:
+            print(f"   Columns: {list(df.columns)}")
+            print(f"   Date range: {df['datetime'].min()} to {df['datetime'].max()}")
+            
+            # Show unique parameters extracted
+            if 'param' in df.columns:
+                params = df['param'].unique()
+                print(f"   Unique parameters: {len(params)}")
+                print(f"   Sample parameters:")
+                for param in params[:10]:
+                    count = len(df[df['param'] == param])
+                    print(f"     - {param}: {count} records")
+                    
+                if len(params) > 10:
+                    print(f"     ... and {len(params) - 10} more")
+            
+            # Show sample data
+            print(f"\n📋 Sample extracted data:")
+            pd.set_option('display.max_columns', None)
+            pd.set_option('display.width', None)
+            print(df.head(5).to_string())
+            
+            return True
+        else:
+            print("❌ No data extracted from samlog.txt")
+            
+            # Debug: Check what lines contain statistics
+            print("\n🔍 Debugging - checking for statistics patterns...")
+            with open(samlog_path, 'r') as f:
+                lines = f.readlines()
+                
+            stats_lines = []
+            for i, line in enumerate(lines[:50]):  # Check first 50 lines
+                if any(keyword in line.lower() for keyword in ['logstatistics', 'count=', 'avg=', 'max=', 'min=']):
+                    stats_lines.append((i+1, line.strip()))
+            
+            if stats_lines:
+                print(f"   Found {len(stats_lines)} lines with statistics in first 50 lines:")
+                for line_num, line in stats_lines[:3]:
+                    print(f"     Line {line_num}: {line[:100]}...")
+            else:
+                print("   No statistics patterns found in first 50 lines")
+                
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error testing parser: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def test_parameter_mapping():
+    """Test parameter mapping with mapedname.txt"""
+    print("\n🗺️ Testing Parameter Mapping")
+    print("=" * 30)
+    
+    try:
+        mapedname_path = "data/mapedname.txt"
+        if not os.path.exists(mapedname_path):
+            print(f"❌ mapedname.txt not found at {mapedname_path}")
+            return False
+            
+        print(f"📂 Reading {mapedname_path}...")
+        with open(mapedname_path, 'r') as f:
+            lines = f.readlines()
+            
+        # Parse mapping file
+        mappings = []
+        for line in lines[2:]:  # Skip header lines
+            line = line.strip()
+            if line and '|' in line:
+                parts = [p.strip() for p in line.split('|')]
+                if len(parts) >= 3 and parts[0] and not parts[0].startswith('-'):
+                    mappings.append({
+                        'machine_name': parts[0],
+                        'friendly_name': parts[1], 
+                        'unit': parts[2] if len(parts) > 2 else ''
+                    })
+        
+        print(f"📊 Parameter mappings found: {len(mappings)}")
+        print(f"   Sample mappings:")
+        for mapping in mappings[:5]:
+            print(f"     - {mapping['machine_name']} → {mapping['friendly_name']} ({mapping['unit']})")
+            
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error testing parameter mapping: {e}")
+        return False
+
+if __name__ == "__main__":
+    print("🚀 HALOGx Parser Testing")
+    print("=" * 50)
+    
+    success1 = test_parser_with_samlog()
+    success2 = test_parameter_mapping() 
+    
+    print("\n" + "=" * 50)
+    if success1 and success2:
+        print("✅ All tests passed!")
+    else:
+        print("❌ Some tests failed. Check output above.")
+        
+    print("=" * 50)
 from datetime import datetime
 
 def test_parser():
