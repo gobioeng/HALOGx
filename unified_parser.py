@@ -558,24 +558,301 @@ class UnifiedParser:
 
         for line_number, line in chunk_lines:
             try:
-                # Enhanced filtering - look for more patterns, not just count= and avg=
-                # This addresses the issue of extracting too few data points
-                has_statistics = any(keyword in line.lower() for keyword in [
-                    'count=', 'avg=', 'statistics', 'stat', 'max=', 'min=', 
-                    'value=', 'reading=', 'measurement='
-                ])
-                
-                if not has_statistics:
-                    continue
+                # Detect if this is tab-separated format (new LINAC format)
+                if '\t' in line and line.count('\t') >= 7:
+                    # Parse as tab-separated LINAC format
+                    parsed_records = self._parse_tab_separated_line(line, line_number)
+                    records.extend(parsed_records)
+                else:
+                    # Enhanced filtering - look for more patterns, not just count= and avg=
+                    # This addresses the issue of extracting too few data points
+                    has_statistics = any(keyword in line.lower() for keyword in [
+                        'count=', 'avg=', 'statistics', 'stat', 'max=', 'min=', 
+                        'value=', 'reading=', 'measurement='
+                    ])
+                    
+                    if not has_statistics:
+                        continue
 
-                parsed_records = self._parse_line_optimized(line, line_number, 
-                                                          water_pattern, datetime_pattern, 
-                                                          datetime_alt_pattern, serial_pattern)
-                records.extend(parsed_records)
+                    parsed_records = self._parse_line_optimized(line, line_number, 
+                                                              water_pattern, datetime_pattern, 
+                                                              datetime_alt_pattern, serial_pattern)
+                    records.extend(parsed_records)
             except Exception as e:
                 self.parsing_stats["errors_encountered"] += 1
 
         return records
+
+    def _parse_tab_separated_line(self, line: str, line_number: int) -> List[Dict]:
+        """Parse tab-separated LINAC log format (new format)"""
+        records = []
+        
+        try:
+            # Split by tabs - expected format:
+            # Date      Time    Source  Level   Timestamp       SN#     System  Component       Message
+            parts = line.split('\t')
+            if len(parts) < 9:
+                return records
+                
+            date_str = parts[0].strip()
+            time_str = parts[1].strip()
+            source = parts[2].strip()
+            level = parts[3].strip()
+            timestamp = parts[4].strip()
+            sn_field = parts[5].strip()
+            system = parts[6].strip()
+            component = parts[7].strip()
+            message = parts[8].strip()
+            
+            # Extract serial number
+            serial_number = self._extract_serial_from_field(sn_field)
+            
+            # Create datetime
+            try:
+                datetime_obj = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                return records
+            
+            # Check if message contains sensor data statistics
+            if 'logStatistics' in message and any(keyword in message for keyword in ['count=', 'max=', 'min=', 'avg=']):
+                # Extract parameter data from message
+                param_records = self._extract_statistics_from_message(message, datetime_obj, serial_number, system, component, line_number)
+                records.extend(param_records)
+            
+            # Check for temperature sensor data
+            if 'TemperatureSensor' in message or 'cpuTemperatureSensor' in message:
+                temp_records = self._extract_temperature_data(message, datetime_obj, serial_number, system, component, line_number)
+                records.extend(temp_records)
+            
+            # Check for system mode information
+            if 'SystemMode:' in message:
+                mode_records = self._extract_system_mode(message, datetime_obj, serial_number, system, component, line_number)
+                records.extend(mode_records)
+                
+            # Check for odometer data
+            if 'Odometer' in message:
+                odometer_records = self._extract_odometer_data(message, datetime_obj, serial_number, system, component, line_number)
+                records.extend(odometer_records)
+                
+            # Check for EMO and motion events
+            if any(event in message for event in ['EMO Good', 'Disable Motion', 'Enable Motion']):
+                event_records = self._extract_event_data(message, datetime_obj, serial_number, system, component, line_number)
+                records.extend(event_records)
+                
+        except Exception as e:
+            print(f"Error parsing tab-separated line {line_number}: {e}")
+            self.parsing_stats["errors_encountered"] += 1
+            
+        return records
+    
+    def _extract_serial_from_field(self, sn_field: str) -> str:
+        """Extract serial number from SN# field - handles multiple formats"""
+        sn_field = sn_field.strip()
+        
+        # Handle different serial number formats found in logs
+        if 'SN#' in sn_field:
+            # Format: "SN# 2182"
+            return sn_field.replace('SN#', '').strip()
+        elif sn_field.startswith('HAL-TRT-SN'):
+            # Format: "HAL-TRT-SN2182" 
+            return sn_field.replace('HAL-TRT-SN', '').strip()
+        elif sn_field.startswith('SN'):
+            # Format: "SN2182" or "SN 2182"
+            return sn_field.replace('SN', '').strip()
+        elif sn_field.isdigit():
+            # Format: "2182" (plain number)
+            return sn_field
+        else:
+            # Try to extract any number from the field
+            import re
+            match = re.search(r'(\d+)', sn_field)
+            if match:
+                return match.group(1)
+            else:
+                return sn_field  # Return as-is if no pattern matches
+    
+    def _extract_statistics_from_message(self, message: str, datetime_obj: datetime, 
+                                       serial_number: str, system: str, component: str, line_number: int) -> List[Dict]:
+        """Extract statistical data from log message"""
+        records = []
+        
+        # Pattern to match: logStatistics parameterName: count=X, max=Y, min=Z, avg=W
+        log_stats_pattern = re.compile(
+            r'logStatistics\s+([^:]+):\s*'
+            r'(?:count\s*=\s*(\d+)[,\s]*)?'
+            r'(?:max\s*=\s*([\d.\-+eE]+)[,\s]*)?'
+            r'(?:min\s*=\s*([\d.\-+eE]+)[,\s]*)?'
+            r'(?:avg\s*=\s*([\d.\-+eE]+))?',
+            re.IGNORECASE
+        )
+        
+        match = log_stats_pattern.search(message)
+        if match:
+            param_name = match.group(1).strip()
+            count = match.group(2)
+            max_val = match.group(3)
+            min_val = match.group(4)
+            avg_val = match.group(5)
+            
+            # Normalize parameter name
+            normalized_param = self._normalize_parameter_name(param_name)
+            
+            # Create records for each statistic type if available
+            if count:
+                records.append(self._create_record(
+                    datetime_obj, f"{normalized_param}_count", count, 
+                    "count", serial_number, system, component, line_number
+                ))
+            
+            if max_val:
+                records.append(self._create_record(
+                    datetime_obj, f"{normalized_param}_max", float(max_val), 
+                    self._get_unit_for_parameter(normalized_param), serial_number, system, component, line_number
+                ))
+                
+            if min_val:
+                records.append(self._create_record(
+                    datetime_obj, f"{normalized_param}_min", float(min_val), 
+                    self._get_unit_for_parameter(normalized_param), serial_number, system, component, line_number
+                ))
+                
+            if avg_val:
+                records.append(self._create_record(
+                    datetime_obj, f"{normalized_param}_avg", float(avg_val), 
+                    self._get_unit_for_parameter(normalized_param), serial_number, system, component, line_number
+                ))
+        
+        return records
+    
+    def _extract_temperature_data(self, message: str, datetime_obj: datetime, 
+                                 serial_number: str, system: str, component: str, line_number: int) -> List[Dict]:
+        """Extract temperature sensor data from message"""
+        records = []
+        
+        # Pattern for temperature sensors
+        temp_pattern = re.compile(
+            r'(cpuTemperatureSensor\d+|TemperatureSensor\d+):\s*'
+            r'(?:count\s*=\s*(\d+)[,\s]*)?'
+            r'(?:max\s*=\s*([\d.\-+eE]+)[,\s]*)?'
+            r'(?:min\s*=\s*([\d.\-+eE]+)[,\s]*)?'
+            r'(?:avg\s*=\s*([\d.\-+eE]+))?',
+            re.IGNORECASE
+        )
+        
+        match = temp_pattern.search(message)
+        if match:
+            sensor_name = match.group(1)
+            count = match.group(2)
+            max_val = match.group(3)
+            min_val = match.group(4)
+            avg_val = match.group(5)
+            
+            if avg_val:  # Temperature average is most important
+                records.append(self._create_record(
+                    datetime_obj, f"{sensor_name}_avg", float(avg_val), 
+                    "°C", serial_number, system, component, line_number
+                ))
+                
+            if max_val:
+                records.append(self._create_record(
+                    datetime_obj, f"{sensor_name}_max", float(max_val), 
+                    "°C", serial_number, system, component, line_number
+                ))
+                
+        return records
+    
+    def _extract_system_mode(self, message: str, datetime_obj: datetime, 
+                            serial_number: str, system: str, component: str, line_number: int) -> List[Dict]:
+        """Extract system mode information"""
+        records = []
+        
+        # Pattern: "MachineSerialNumber:2182 SystemMode:SERVICE"
+        mode_pattern = re.compile(r'SystemMode:(\w+)', re.IGNORECASE)
+        match = mode_pattern.search(message)
+        
+        if match:
+            mode = match.group(1)
+            records.append(self._create_record(
+                datetime_obj, "system_mode", mode,
+                "mode", serial_number, system, component, line_number
+            ))
+        
+        return records
+    
+    def _extract_odometer_data(self, message: str, datetime_obj: datetime, 
+                              serial_number: str, system: str, component: str, line_number: int) -> List[Dict]:
+        """Extract odometer-related data"""
+        records = []
+        
+        # For now, just record that odometer data was stored/copied
+        if 'storeData' in message and 'Odometer' in message:
+            records.append(self._create_record(
+                datetime_obj, "odometer_update", 1,
+                "count", serial_number, system, component, line_number
+            ))
+        elif 'OdometerRouter' in message and 'copied' in message:
+            records.append(self._create_record(
+                datetime_obj, "odometer_backup", 1,
+                "count", serial_number, system, component, line_number
+            ))
+        
+        return records
+    
+    def _extract_event_data(self, message: str, datetime_obj: datetime, 
+                           serial_number: str, system: str, component: str, line_number: int) -> List[Dict]:
+        """Extract system events like EMO, motion control"""
+        records = []
+        
+        if 'EMO Good' in message:
+            records.append(self._create_record(
+                datetime_obj, "emo_status", 1,  # 1 = Good, 0 = Bad
+                "status", serial_number, system, component, line_number
+            ))
+        elif 'Disable Motion' in message:
+            records.append(self._create_record(
+                datetime_obj, "motion_enabled", 0,  # 0 = Disabled
+                "status", serial_number, system, component, line_number
+            ))
+        elif 'Enable Motion' in message:
+            records.append(self._create_record(
+                datetime_obj, "motion_enabled", 1,  # 1 = Enabled
+                "status", serial_number, system, component, line_number
+            ))
+        
+        return records
+    
+    def _create_record(self, datetime_obj: datetime, parameter_name: str, value, unit: str, 
+                      serial_number: str, system: str, component: str, line_number: int) -> Dict:
+        """Create a standardized data record"""
+        return {
+            'datetime': datetime_obj,
+            'parameter': parameter_name,
+            'value': value,
+            'unit': unit,
+            'serial_number': serial_number,
+            'system': system,
+            'component': component,
+            'line_number': line_number,
+            'source': 'tab_separated_log'
+        }
+    
+    def _get_unit_for_parameter(self, param_name: str) -> str:
+        """Get the appropriate unit for a parameter"""
+        param_lower = param_name.lower()
+        if 'temp' in param_lower:
+            return "°C"
+        elif 'flow' in param_lower:
+            return "L/min"
+        elif 'pressure' in param_lower:
+            return "PSI"
+        elif 'humidity' in param_lower:
+            return "%"
+        elif 'speed' in param_lower or 'fan' in param_lower:
+            return "RPM"
+        elif 'voltage' in param_lower or 'volt' in param_lower or 'v' in param_lower:
+            return "V"
+        else:
+            return "units"
 
     def _parse_line_enhanced(self, line: str, line_number: int) -> List[Dict]:
         """Enhanced line parsing with unified parameter mapping and filtering (legacy method)"""

@@ -5,23 +5,44 @@ Developer: gobioeng.com
 Date: 2025-01-21
 """
 
-# CRITICAL: Import matplotlib and configure before other imports
+# CRITICAL: Import matplotlib without forcing backend - let main.py handle it
 import matplotlib
-# FIXED: Try Qt5Agg first, fall back gracefully for headless environments
-try:
-    matplotlib.use('Qt5Agg')
-except ImportError:
-    # Fallback to Agg for headless environments
-    matplotlib.use('Agg')
-    print("ℹ️ Using Agg backend for headless environment")
-
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
 
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT
-from matplotlib.figure import Figure
+# Backend-agnostic imports - only import Qt components when needed
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from matplotlib.figure import Figure
+
+# Conditional Qt imports - safe for headless environments
+def get_canvas_class():
+    """Get appropriate canvas class based on current backend"""
+    try:
+        current_backend = matplotlib.get_backend().lower()
+        if 'qt' in current_backend:
+            from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+            return FigureCanvas
+        else:
+            # Use Agg backend for headless environments
+            from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+            return FigureCanvas
+    except ImportError:
+        # Fallback to base canvas if Qt is not available
+        from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+        return FigureCanvas
+
+def get_toolbar_class():
+    """Get appropriate toolbar class based on current backend"""
+    try:
+        current_backend = matplotlib.get_backend().lower()
+        if 'qt' in current_backend:
+            from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
+            return NavigationToolbar2QT
+        else:
+            return None  # No toolbar for non-Qt backends
+    except ImportError:
+        return None
 import pandas as pd
 import numpy as np
 from datetime import timedelta
@@ -213,26 +234,111 @@ class PlotUtils:
 
     @staticmethod
     def setup_professional_style():
-        """Setup professional plotting style with Calibri font"""
+        """Setup professional plotting style with enhanced colorful appearance"""
         try:
             # Set professional font
             plt.rcParams['font.family'] = ['Calibri', 'DejaVu Sans', 'sans-serif']
             plt.rcParams['font.size'] = 10
             plt.rcParams['axes.labelsize'] = 11
-            plt.rcParams['axes.titlesize'] = 12
+            plt.rcParams['axes.titlesize'] = 13
             plt.rcParams['xtick.labelsize'] = 9
             plt.rcParams['ytick.labelsize'] = 9
             plt.rcParams['legend.fontsize'] = 9
             
-            # Set colors and styling
+            # Enhanced colorful styling
             plt.rcParams['axes.grid'] = True
-            plt.rcParams['grid.alpha'] = 0.3
+            plt.rcParams['grid.alpha'] = 0.2
+            plt.rcParams['grid.color'] = '#E0E0E0'
             plt.rcParams['axes.spines.top'] = False
             plt.rcParams['axes.spines.right'] = False
-            plt.rcParams['figure.facecolor'] = 'white'
+            plt.rcParams['axes.spines.left'] = True
+            plt.rcParams['axes.spines.bottom'] = True
+            plt.rcParams['axes.axisbelow'] = True
+            
+            # Enhanced figure styling
+            plt.rcParams['figure.facecolor'] = '#FAFAFA'  # Light gray background
+            plt.rcParams['axes.facecolor'] = 'white'
+            plt.rcParams['legend.framealpha'] = 0.95
+            plt.rcParams['legend.shadow'] = True
+            plt.rcParams['legend.fancybox'] = True
+            
+            # Line and marker styling for better visibility
+            plt.rcParams['lines.linewidth'] = 2.5
+            plt.rcParams['lines.markersize'] = 5
+            plt.rcParams['axes.linewidth'] = 1.2
             
         except Exception as e:
             print(f"Style setup warning: {e}")
+    
+    @staticmethod
+    def apply_colorful_enhancements(ax, parameter_name=""):
+        """Apply colorful visual enhancements to plots"""
+        try:
+            # Enhanced grid styling
+            ax.grid(True, alpha=0.3, color='#E0E0E0', linestyle='-', linewidth=0.8)
+            ax.set_axisbelow(True)
+            
+            # Enhanced spine styling
+            for spine in ax.spines.values():
+                spine.set_linewidth(1.2)
+                spine.set_color('#CCCCCC')
+            
+            # Remove top and right spines for cleaner look
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            
+            # Add subtle background gradient effect
+            ax.set_facecolor('#FEFEFE')
+            
+            # Enhanced legend styling if present
+            legend = ax.get_legend()
+            if legend:
+                legend.set_facecolor('#FFFFFF')
+                legend.set_edgecolor('#DDDDDD')
+                legend.set_alpha(0.95)
+                
+            # Color-code axis labels based on parameter type
+            colors = PlotUtils.get_group_colors()
+            title_color = '#2C3E50'  # Default dark blue
+            
+            # Match parameter to color scheme
+            for param_type, color in colors.items():
+                if param_type.lower() in parameter_name.lower():
+                    title_color = color
+                    break
+                    
+            ax.tick_params(colors='#555555', which='both')
+            if ax.get_title():
+                ax.set_title(ax.get_title(), color=title_color, fontweight='bold', pad=20)
+                
+        except Exception as e:
+            print(f"Colorful enhancements warning: {e}")
+    
+    @staticmethod
+    def plot_with_gradient_fill(ax, x_data, y_data, color, label="", alpha=0.7):
+        """Plot line with gradient fill effect for enhanced visualization"""
+        try:
+            # Plot the main line
+            line = ax.plot(x_data, y_data, color=color, linewidth=2.5, 
+                          label=label, marker='o', markersize=4, alpha=alpha)
+            
+            # Add gradient fill under the curve
+            ax.fill_between(x_data, y_data, alpha=0.3, color=color)
+            
+            # Add subtle shadow effect by plotting a slightly offset duplicate
+            if len(x_data) > 1:
+                # Create shadow offset
+                y_offset = (max(y_data) - min(y_data)) * 0.02  # 2% of range
+                ax.plot(x_data, [y - y_offset for y in y_data], 
+                       color='gray', linewidth=2, alpha=0.2, zorder=0)
+            
+            return line
+            
+        except Exception as e:
+            print(f"Gradient fill plotting error: {e}")
+            # Fallback to regular line plot
+            return ax.plot(x_data, y_data, color=color, linewidth=2.5, 
+                          label=label, marker='o', markersize=4, alpha=alpha)
 
     @staticmethod
     def group_parameters(parameters):
@@ -275,17 +381,43 @@ class PlotUtils:
 
     @staticmethod
     def get_group_colors():
-        """Get consistent colors for parameter groups"""
+        """Get consistent colors for parameter groups with enhanced vibrant palette"""
         return {
-            'Temperature': '#FF6B6B',  # Red
-            'Pressure': '#4ECDC4',     # Teal
-            'Flow': '#45B7D1',         # Blue
-            'Level': '#96CEB4',        # Green
-            'Voltage': '#FECA57',      # Yellow
-            'Current': '#FF9FF3',      # Pink
-            'Humidity': '#54A0FF',     # Light Blue
-            'Position': '#5F27CD',     # Purple
-            'Other': '#636E72'         # Gray
+            'Temperature': '#FF6B6B',  # Vibrant Red
+            'Pressure': '#4ECDC4',     # Turquoise 
+            'Flow': '#45B7D1',         # Sky Blue
+            'Level': '#96CEB4',        # Mint Green
+            'Voltage': '#FECA57',      # Sunny Yellow
+            'Current': '#FF9FF3',      # Hot Pink
+            'Humidity': '#54A0FF',     # Electric Blue
+            'Position': '#5F27CD',     # Deep Purple
+            'cpuTemperatureSensor': '#FF4757',  # Bright Red for CPU temps
+            'system_mode': '#2ED573',   # Bright Green for system status
+            'emo_status': '#FFA502',    # Orange for emergency status
+            'motion_enabled': '#3742FA',  # Blue for motion control
+            'odometer_update': '#FF6348', # Coral for odometer events
+            'Other': '#636E72'         # Neutral Gray
+        }
+    
+    @staticmethod
+    def get_enhanced_color_palette():
+        """Get enhanced color palette with gradients and effects"""
+        return {
+            'primary_colors': ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57', '#FF9FF3'],
+            'gradient_pairs': [
+                ('#FF6B6B', '#FF8E53'),  # Red to Orange
+                ('#4ECDC4', '#44A08D'),  # Teal to Green
+                ('#45B7D1', '#2D9CDB'),  # Light Blue to Blue
+                ('#96CEB4', '#FFEAA7'),  # Green to Yellow
+                ('#FECA57', '#FF7675'),  # Yellow to Pink
+                ('#FF9FF3', '#A29BFE')   # Pink to Purple
+            ],
+            'alert_colors': {
+                'critical': '#E74C3C',   # Bright Red
+                'warning': '#F39C12',    # Orange  
+                'normal': '#27AE60',     # Green
+                'info': '#3498DB'        # Blue
+            }
         }
 
     @staticmethod
@@ -529,24 +661,25 @@ class EnhancedPlotWidget(QWidget):
         self.init_ui()
     
     def init_ui(self):
-        """Initialize plotting UI with enhanced error handling and backend verification"""
+        """Initialize plotting UI with backend-agnostic canvas creation"""
         self.layout = QVBoxLayout(self)
         self.setMinimumHeight(300)
         
         try:
-            # Ensure matplotlib backend is properly configured
-            backend = matplotlib.get_backend()
-            if backend.lower() != 'qt5agg':
-                print(f"Warning: matplotlib backend is {backend}, expected Qt5Agg")
-                matplotlib.use('Qt5Agg', force=True)
-                
+            # Get appropriate canvas class based on current backend
+            FigureCanvas = get_canvas_class()
+            
             # FIXED: Smaller figure size for embedded use with proper DPI
             self.figure = Figure(figsize=(8, 4), dpi=100)
             self.canvas = FigureCanvas(self.figure)
             
-            # CRITICAL: Ensure proper parent-child relationship to prevent popup windows
-            self.canvas.setParent(self)
-            self.canvas.setFocusPolicy(1)  # Allow focus for interactions
+            # CRITICAL: Only set Qt-specific properties if using Qt backend
+            backend = matplotlib.get_backend().lower()
+            if 'qt' in backend and hasattr(self.canvas, 'setParent'):
+                self.canvas.setParent(self)
+                if hasattr(self.canvas, 'setFocusPolicy'):
+                    self.canvas.setFocusPolicy(1)  # Allow focus for interactions
+            
             self.layout.addWidget(self.canvas)
             
             # Apply professional styling
@@ -690,17 +823,23 @@ class EnhancedDualPlotWidget(QWidget):
         self.init_ui()
         
     def init_ui(self):
-        """Initialize dual plot UI"""
+        """Initialize dual plot UI with backend-agnostic canvas creation"""
         self.layout = QVBoxLayout(self)
         self.setMinimumHeight(500)  # Taller for dual plots
         
         try:
+            # Get appropriate canvas class based on current backend
+            FigureCanvas = get_canvas_class()
+            
             # Create figure with subplots
             self.figure = Figure(figsize=(10, 8), dpi=80)
             self.canvas = FigureCanvas(self.figure)
             
-            # CRITICAL: Ensure proper parent-child relationship
-            self.canvas.setParent(self)
+            # CRITICAL: Only set Qt-specific properties if using Qt backend
+            backend = matplotlib.get_backend().lower()
+            if 'qt' in backend and hasattr(self.canvas, 'setParent'):
+                self.canvas.setParent(self)
+            
             self.layout.addWidget(self.canvas)
             
             # Apply professional styling

@@ -2192,8 +2192,8 @@ Source: {result.get('source', 'unknown')} database
                 """Display analysis results after worker completes"""
                 try:
                     if progress_dialog:
-                        progress_dialog.setValue(100)
-                        progress_dialog.close()
+                        self.progress_dialog.setValue(100)
+                        self.progress_dialog.close()
 
                     if "trends" in results:
                         self._populate_trends_table(results["trends"])
@@ -2819,9 +2819,11 @@ Source: {result.get('source', 'unknown')} database
                         parsing_stats=parsing_stats_json,
                     )
                     
-                    progress_dialog.mark_complete()
+                    if hasattr(self, 'progress_dialog') and self.progress_dialog:
+                        self.progress_dialog.mark_complete()
                     QtWidgets.QApplication.processEvents()
-                    progress_dialog.close()
+                    if hasattr(self, 'progress_dialog') and self.progress_dialog:
+                        self.progress_dialog.close()
                     
                     return records_inserted
                     
@@ -3082,7 +3084,7 @@ Source: {result.get('source', 'unknown')} database
                             if 'tb' in line_lower or 'halfault' in line_lower or 'hal fault' in line_lower:
                                 filtered_lines.append(line)
 
-                    progress_dialog.setValue(30)
+                    self.progress_dialog.setValue(30)
                     QtWidgets.QApplication.processEvents()
 
                     print(f"Filtered {len(filtered_lines)} relevant lines from file")
@@ -3094,7 +3096,7 @@ Source: {result.get('source', 'unknown')} database
                             temp_file.writelines(filtered_lines)
                             temp_path = temp_file.name
 
-                        progress_dialog.setValue(50)
+                        self.progress_dialog.setValue(50)
                         QtWidgets.QApplication.processEvents()
 
                         # Parse the filtered data
@@ -3102,13 +3104,13 @@ Source: {result.get('source', 'unknown')} database
                         parser = UnifiedParser()
                         df = parser.parse_linac_file(temp_path)
 
-                        progress_dialog.setValue(70)
+                        self.progress_dialog.setValue(70)
                         QtWidgets.QApplication.processEvents()
 
                         # Insert only the filtered data
                         records_inserted = self.db.insert_data_batch(df)
 
-                        progress_dialog.setValue(90)
+                        self.progress_dialog.setValue(90)
                         QtWidgets.QApplication.processEvents()
 
                         # Clean up temporary file
@@ -3125,8 +3127,8 @@ Source: {result.get('source', 'unknown')} database
                             parsing_stats=parsing_stats_json,
                         )
 
-                        progress_dialog.setValue(100)
-                        progress_dialog.close()
+                        self.progress_dialog.setValue(100)
+                        self.progress_dialog.close()
 
                         # Refresh data
                         try:
@@ -3258,6 +3260,14 @@ Source: {result.get('source', 'unknown')} database
                     )
                     traceback.print_exc()
 
+            def show_settings(self):
+                """Show settings dialog (placeholder implementation)"""
+                QtWidgets.QMessageBox.information(
+                    self,
+                    "Settings",
+                    "Settings dialog is not yet implemented.\n\nFuture versions will include:\n• Display preferences\n• Data import settings\n• Chart customization options"
+                )
+
             def clear_database(self):
                 """Clear database with professional confirmation"""
                 try:
@@ -3293,8 +3303,8 @@ Source: {result.get('source', 'unknown')} database
 
                         self.load_dashboard()
 
-                        progress_dialog.setValue(100)
-                        progress_dialog.close()
+                        self.progress_dialog.setValue(100)
+                        self.progress_dialog.close()
 
                         QtWidgets.QMessageBox.information(
                             self, "Database", "Data cleared successfully."
