@@ -4,8 +4,7 @@ magnetronFlow                                    | Magnetron Flow               
 targetAndCirculatorFlow                          | Target & Circulator Flow           | L/min
 magnetronTemp                                    | Magnetron Temperature              | °C
 targetAndCirculatorTemp                          | Target & Circulator Temperature    | °C
-flowSensorPower12V                               | Flow Sensor Power                  | V
-sf6SensorPower12V                                | SF6 Sensor Power                   | V
+
 sf6GasPressure                                   | SF6 Gas Pressure                   | PSI
 CoolingpumpHighStatistics                        | Water Pump Pressure                | PSI
 CoolingcityWaterTempStatistics                   | City water flow		      |l/m
@@ -18,24 +17,7 @@ COL_BOARD_TEMP_MON_STAT                          | COL Board Temperature        
 
 
 
-MLC_ADC_CHAN_PROXIMAL_10V_BANKA_MON_STAT         | MLC Proximal 10V Bank A            | V
-MLC_ADC_CHAN_PROXIMAL_10V_BANKB_MON_STAT         | MLC Proximal 10V Bank B            | V
-MLC_ADC_CHAN_DISTAL_10V_BANKA_MON_STAT           | MLC Distal 10V Bank A              | V
-MLC_ADC_CHAN_DISTAL_10V_BANKB_MON_STAT           | MLC Distal 10V Bank B              | V
-MLC_ADC_CHAN_24V_BANKA_MON_STAT                  | MLC 24V Bank A                     | V
-MLC_ADC_CHAN_24V_BANKB_MON_STAT                  | MLC 24V Bank B                     | V
-MLC_ADC_CHAN_P12VA_BANKA_MON_STAT                | MLC +12V Analog Bank A             | V
-MLC_ADC_CHAN_P12VA_BANKB_MON_STAT                | MLC +12V Analog Bank B             | V
-MLC_ADC_CHAN_M11V_BANKA_MON_STAT                 | MLC -11V Bank A                    | V
-MLC_ADC_CHAN_M11V_BANKB_MON_STAT                 | MLC -11V Bank B                    | V
-MLC_ADC_CHAN_5V_BANKA_MON_STAT                   | MLC 5V Bank A                      | V
-MLC_ADC_CHAN_5V_BANKB_MON_STAT                   | MLC 5V Bank B                      | V
-MLC_ADC_CHAN_P5VA_BANKA_MON_STAT                 | MLC +5V Analog Bank A              | V
-MLC_ADC_CHAN_P5VA_BANKB_MON_STAT                 | MLC +5V Analog Bank B              | V
-MLC_ADC_CHAN_3_3V_BANKA_MON_STAT                 | MLC 3.3V Bank A                    | V
-MLC_ADC_CHAN_3_3V_BANKB_MON_STAT                 | MLC 3.3V Bank B                    | V
-MLC_ADC_CHAN_1_2V_BANKA_MON_STAT                 | MLC 1.2V Bank A                    | V
-MLC_ADC_CHAN_1_2V_BANKB_MON_STAT                 | MLC 1.2V Bank B                    | V
+
 
 MLC_ADC_CHAN_M48V_BANKA_MON_STAT                 | MLC -48V Bank A                    | V
 MLC_ADC_CHAN_M48V_BANKB_MON_STAT                 | MLC -48V Bank B                    | V
@@ -45,9 +27,9 @@ MLC_ADC_CHAN_M48V_BANKB_MON_STAT                 | MLC -48V Bank B              
 
 onBoardAnalogN12V                                | Onboard Analog -12V                | V
 onBoardAnalogN5V                                 | Onboard Analog -5V                 | V
-onBoardAnalogP1_25V                              | Onboard Analog +1.25V              | V
+
 onBoardAnalogP12V                                | Onboard Analog +12V                | V
-onBoardAnalogP3V                                 | Onboard Analog +3V                 | V
+
 onBoardAnalogP5V                                 | Onboard Analog +5V                 | V
 onBoardDigitalP5V                                | Onboard Digital +5V                | V
 
@@ -75,14 +57,3 @@ BeamOdometers - ArcCount                         | Beam Arc Count               
 BeamOdometers - BeamOnTime                       | Beam On Time                       | s
 BeamOdometers - HVOnTime                         | High Voltage On Time               | s
 BeamOdometers - MagFilOnTime                     | Magnetron Filament On Time         | s
-
-
-EMO Good Event Detected                          | EMO Good Event                     | event
-
-# Additional parameters found in samlog.txt - AI categorized for appropriate trend tabs
-cpuTemperatureSensor0                            | CPU Temperature Sensor 0          | °C
-cpuTemperatureSensor1                            | CPU Temperature Sensor 1          | °C
-COL_ADC_CHAN_24V_MON_STAT                        | COL ADC 24V Monitor                | V
-COL_ADC_CHAN_5V_MON_STAT                         | COL ADC 5V Monitor                 | V
-MLC_ADC_CHAN_24V_BANKA_MON_STAT                  | MLC Bank A 24V Monitor             | V
-MLC_ADC_CHAN_TEMP_BANKA_STAT                     | MLC Bank A Temperature             | °C
