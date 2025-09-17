@@ -435,21 +435,30 @@ class PlotUtils:
         if auto_threshold:
             # Calculate data time span
             total_span = df_times_sorted[-1] - df_times_sorted[0]
+            total_days = total_span.total_seconds() / (24*3600)
             
             # Adaptive threshold based on data span and density
-            if total_span.total_seconds() < 24*3600:  # Less than 1 day
+            if total_days < 1:  # Less than 1 day
                 default_threshold = timedelta(hours=1)
-            elif total_span.total_seconds() < 7*24*3600:  # Less than 1 week
+            elif total_days < 7:  # Less than 1 week
                 default_threshold = timedelta(hours=6)
-            elif total_span.total_seconds() < 30*24*3600:  # Less than 1 month
+            elif total_days < 30:  # Less than 1 month
                 default_threshold = timedelta(days=1)
             else:  # More than 1 month - use larger threshold to prevent excessive breaks
                 default_threshold = timedelta(days=3)
                 
-            # Additional check: if we have dense data, increase threshold
-            if len(df_times_sorted) > 1000:  # Dense data
-                if total_span.total_seconds() > 20*24*3600:  # 20+ days
-                    default_threshold = timedelta(days=7)  # Prevent breaks in long datasets
+            # Special handling for 20+ day datasets to prevent unnecessary breaks
+            if total_days >= 20:
+                # For long datasets, use a more generous threshold
+                if len(df_times_sorted) < 100:  # Sparse data over long period
+                    default_threshold = timedelta(days=7)
+                else:  # Dense data over long period
+                    default_threshold = timedelta(days=3)
+                    
+            # Additional check: if we have very dense data, increase threshold further
+            if len(df_times_sorted) > 1000:  # Very dense data
+                if total_days > 20:  # 20+ days with dense data
+                    default_threshold = timedelta(days=5)  # Prevent breaks in long dense datasets
                     
             gap_threshold = gap_threshold or default_threshold
         else:
