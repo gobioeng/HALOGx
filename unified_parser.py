@@ -1290,17 +1290,24 @@ class UnifiedParser:
             
         validated_df = df.copy()
         
+        # Determine the value column to use
+        value_column = None
+        if 'avg_value' in validated_df.columns:
+            value_column = 'avg_value'
+        elif 'value' in validated_df.columns:
+            value_column = 'value'
+        
         # Ensure value column is numeric before validation
-        if 'value' in validated_df.columns:
-            validated_df['value'] = pd.to_numeric(validated_df['value'], errors='coerce')
+        if value_column:
+            validated_df[value_column] = pd.to_numeric(validated_df[value_column], errors='coerce')
             # Remove rows where value couldn't be converted to numeric
-            validated_df = validated_df.dropna(subset=['value'])
+            validated_df = validated_df.dropna(subset=[value_column])
         
         # Apply parameter-specific validation rules
         for param_type in validated_df['parameter_type'].unique():
             param_data = validated_df[validated_df['parameter_type'] == param_type]
             
-            if param_data.empty:
+            if param_data.empty or not value_column:
                 continue
                 
             # Get expected range for this parameter
@@ -1311,7 +1318,7 @@ class UnifiedParser:
                 
                 try:
                     # Flag values outside expected range
-                    mask = (param_data['value'] < min_val) | (param_data['value'] > max_val)
+                    mask = (param_data[value_column] < min_val) | (param_data[value_column] > max_val)
                     outliers = mask.sum()
                     
                     if outliers > 0:
@@ -1382,8 +1389,17 @@ class UnifiedParser:
         
         # Check for stuck sensors (repeated values)
         for param_type in df['parameter_type'].unique()[:10]:  # Check top 10 parameters
-            param_data = df[df['parameter_type'] == param_type]['value']
-            if len(param_data) > 5:
+            param_df = df[df['parameter_type'] == param_type]
+            
+            # Use appropriate value column
+            value_column = None
+            if 'avg_value' in param_df.columns:
+                value_column = 'avg_value'
+            elif 'value' in param_df.columns:
+                value_column = 'value'
+            
+            if value_column and len(param_df) > 5:
+                param_data = param_df[value_column]
                 unique_values = param_data.nunique()
                 if unique_values == 1:
                     issues.append(f"Stuck sensor: {param_type}")
@@ -1391,12 +1407,15 @@ class UnifiedParser:
                     issues.append(f"Low variability: {param_type}")
         
         # Check for negative values where they shouldn't exist
-        for param_type in ['flow', 'pressure', 'humidity']:
-            param_mask = df['parameter_type'].str.contains(param_type, case=False, na=False)
-            if param_mask.any():
-                negative_count = (df[param_mask]['value'] < 0).sum()
-                if negative_count > 0:
-                    issues.append(f"Negative {param_type} values: {negative_count}")
+        value_column = 'avg_value' if 'avg_value' in df.columns else 'value' if 'value' in df.columns else None
+        
+        if value_column:
+            for param_type in ['flow', 'pressure', 'humidity']:
+                param_mask = df['parameter_type'].str.contains(param_type, case=False, na=False)
+                if param_mask.any():
+                    negative_count = (df[param_mask][value_column] < 0).sum()
+                    if negative_count > 0:
+                        issues.append(f"Negative {param_type} values: {negative_count}")
         
         return issues
 
