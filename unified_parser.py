@@ -122,27 +122,16 @@ class UnifiedParser:
             "datetime_alt": re.compile(
                 r"(\d{1,2}/\d{1,2}/\d{4})[ \t]+(\d{1,2}:\d{2}:\d{2})"
             ),
-            # Enhanced parameter patterns - more flexible and comprehensive
+            # Enhanced parameter patterns - optimized for HALOG format
             "water_parameters": re.compile(
-                r"([a-zA-Z][a-zA-Z0-9_\s\-\.:]*[a-zA-Z0-9])"  # More flexible parameter name capture
-                r"[:\s]*(?:count\s*=\s*(\d+)[,\s]*)??"           # Optional count
-                r"(?:max\s*=\s*([\d.\-+eE]+)[,\s]*)??"           # Optional max with scientific notation support
-                r"(?:min\s*=\s*([\d.\-+eE]+)[,\s]*)??"           # Optional min with scientific notation support
-                r"(?:avg\s*=\s*([\d.\-+eE]+))??"                 # Optional avg with scientific notation support
-                r"|"  # OR alternative pattern
-                r"([a-zA-Z][a-zA-Z0-9_\s\-\.:]*[a-zA-Z0-9])"     # Alternative parameter capture
-                r"[:\s]*(?:value\s*=\s*([\d.\-+eE]+))??"         # Alternative value pattern
-                r"|"  # OR another alternative
-                r"([a-zA-Z][a-zA-Z0-9_\s\-\.:]*[a-zA-Z0-9])"     # Another parameter capture
-                r"[:\s]*(?:reading\s*=\s*([\d.\-+eE]+))??"       # Reading pattern
-                r"|"  # OR statistics pattern
-                r"([a-zA-Z][a-zA-Z0-9_\s\-\.:]*[a-zA-Z0-9])"     # Statistics parameter
-                r"[:\s]*(?:Statistics[:\s]*)??"                   # Optional Statistics keyword
-                r"(?:count\s*=\s*(\d+)[,\s]*)??"                 # Statistics count
-                r"(?:max\s*=\s*([\d.\-+eE]+)[,\s]*)??"          # Statistics max
-                r"(?:min\s*=\s*([\d.\-+eE]+)[,\s]*)??"          # Statistics min
-                r"(?:avg\s*=\s*([\d.\-+eE]+))??",               # Statistics avg
-                re.IGNORECASE,
+                r"(?:logStatistics\s+)?"                         # Optional logStatistics prefix
+                r"([a-zA-Z][a-zA-Z0-9_\-\.]*[a-zA-Z0-9])"       # Parameter name (no spaces, more strict)
+                r":\s*"                                          # Colon separator
+                r"count\s*=\s*(\d+)"                            # Required count
+                r"(?:[,\s]*max\s*=\s*([\d.\-+eE]+))?"           # Optional max
+                r"(?:[,\s]*min\s*=\s*([\d.\-+eE]+))?"           # Optional min  
+                r"(?:[,\s]*avg\s*=\s*([\d.\-+eE]+))?"           # Optional avg
+                , re.IGNORECASE
             ),
             # Serial number patterns with more variations
             "serial_number": re.compile(r"(?:SN|S/N|Serial)[#\s]*(\d+)", re.IGNORECASE),
@@ -562,18 +551,21 @@ class UnifiedParser:
         df = pd.DataFrame(records)
         cleaned_df = self._clean_and_validate_data(df)
         
+        # Apply parameter merging for equivalent parameters
+        merged_df = self._merge_equivalent_parameters(cleaned_df)
+        
         # Update parsing statistics and log summary
-        self._update_parsing_statistics(len(records), cleaned_df)
+        self._update_parsing_statistics(len(records), merged_df)
         self._log_parsing_summary(file_path)
         
-        return cleaned_df
+        return merged_df
 
     def _process_chunk(self, chunk_lines: List[Tuple[int, str]]) -> List[Dict]:
         """Process a chunk of lines (legacy method for compatibility)"""
         return self._process_chunk_optimized(chunk_lines)
 
     def _process_chunk_optimized(self, chunk_lines: List[Tuple[int, str]]) -> List[Dict]:
-        """Optimized chunk processing with enhanced data extraction"""
+        """Optimized chunk processing with enhanced data extraction and strict filtering"""
         records = []
 
         # Pre-compile frequently used patterns for this chunk
@@ -584,14 +576,15 @@ class UnifiedParser:
 
         for line_number, line in chunk_lines:
             try:
+                self.parsing_stats["total_lines_read"] += 1
+                
                 # Detect if this is tab-separated format (new LINAC format)
                 if '\t' in line and line.count('\t') >= 7:
                     # Parse as tab-separated LINAC format
                     parsed_records = self._parse_tab_separated_line(line, line_number)
                     records.extend(parsed_records)
                 else:
-                    # Enhanced filtering - look for more patterns, not just count= and avg=
-                    # This addresses the issue of extracting too few data points
+                    # Enhanced filtering - look for statistics patterns
                     has_statistics = any(keyword in line.lower() for keyword in [
                         'count=', 'avg=', 'statistics', 'stat', 'max=', 'min=', 
                         'value=', 'reading=', 'measurement='
@@ -599,6 +592,21 @@ class UnifiedParser:
                     
                     if not has_statistics:
                         continue
+
+                    # Detect potential parameter before full parsing for performance
+                    if self.enhanced_mapper:
+                        # Quick check if line contains any allowed parameters
+                        line_lower = line.lower()
+                        has_allowed_param = any(
+                            param.lower() in line_lower 
+                            for param in list(self.enhanced_mapper.parameter_mapping.keys())[:10]  # Check first 10 for performance
+                        )
+                        if not has_allowed_param:
+                            self.parsing_stats["skipped_records"] += 1
+                            self.parsing_stats["skipped_reasons"]["no_allowed_params"] = self.parsing_stats["skipped_reasons"].get("no_allowed_params", 0) + 1
+                            continue
+
+                    self.parsing_stats["parameters_detected"] += 1
 
                     parsed_records = self._parse_line_optimized(line, line_number, 
                                                               water_pattern, datetime_pattern, 
@@ -890,7 +898,7 @@ class UnifiedParser:
 
     def _parse_line_optimized(self, line: str, line_number: int, 
                             water_pattern, datetime_pattern, datetime_alt_pattern, serial_pattern) -> List[Dict]:
-        """Optimized line parsing with pre-compiled patterns and reduced regex calls"""
+        """Optimized line parsing with strict parameter filtering and merging"""
         records = []
 
         # Extract datetime with optimized patterns
@@ -904,6 +912,8 @@ class UnifiedParser:
                 datetime_str = f"{match.group(1)} {match.group(2)}"
 
         if not datetime_str:
+            self.parsing_stats["skipped_records"] += 1
+            self.parsing_stats["skipped_reasons"]["no_datetime"] = self.parsing_stats["skipped_reasons"].get("no_datetime", 0) + 1
             return records
 
         # Extract serial number (cached for performance)
@@ -917,30 +927,52 @@ class UnifiedParser:
         if water_match:
             param_name = water_match.group(1).strip()
 
-            # Optimized parameter filtering - use cached mapping
-            normalized_param = self._normalize_parameter_name_cached(param_name)
-            if not normalized_param:  # Parameter not in our target list
-                return records
+            # STRICT PARAMETER FILTERING - only process parameters from mapedname.txt
+            if self.enhanced_mapper and not self.enhanced_mapper.is_parameter_allowed(param_name):
+                self.parsing_stats["skipped_records"] += 1
+                self.parsing_stats["skipped_reasons"]["unmapped_parameter"] = self.parsing_stats["skipped_reasons"].get("unmapped_parameter", 0) + 1
+                return records  # Skip parameters not in mapedname.txt
+
+            # Check if parameter should be merged
+            should_merge, unified_name, source_params = False, param_name, [param_name]
+            if self.enhanced_mapper:
+                should_merge, unified_name, source_params = self.enhanced_mapper.should_merge_parameter(param_name)
+
+            # Map parameter using enhanced mapper
+            param_mapping = self.enhanced_mapper.map_parameter_name(param_name) if self.enhanced_mapper else {
+                'friendly_name': param_name, 'unit': '', 'machine_name': param_name
+            }
 
             try:
                 count = int(water_match.group(2))
                 max_val = float(water_match.group(3))
                 min_val = float(water_match.group(4))
                 avg_val = float(water_match.group(5))
+                
+                self.parsing_stats["parameters_mapped"] += 1
+                self.parsing_stats["valid_records_extracted"] += 1
+                
             except (ValueError, IndexError):
+                self.parsing_stats["skipped_records"] += 1
+                self.parsing_stats["skipped_reasons"]["malformed_data"] = self.parsing_stats["skipped_reasons"].get("malformed_data", 0) + 1
                 return records  # Skip malformed numeric data
 
             record = {
                 'datetime': datetime_str,
                 'serial_number': serial_number,
-                'parameter_type': normalized_param,
+                'parameter_type': unified_name,  # Use unified name for merged parameters
+                'parameter_name': param_mapping['friendly_name'],
+                'unit': param_mapping['unit'],
                 'statistic_type': 'combined',
                 'count': count,
                 'max_value': max_val,
                 'min_value': min_val,
                 'avg_value': avg_val,
                 'line_number': line_number,
-                'quality': self._assess_data_quality_fast(normalized_param, avg_val, count)
+                'is_merged': should_merge,
+                'source_parameter': param_name,
+                'unified_sources': source_params if should_merge else None,
+                'quality': self._assess_data_quality_fast(unified_name, avg_val, count)
             }
             records.append(record)
 
@@ -1210,11 +1242,22 @@ class UnifiedParser:
             
             # Validate numeric values with better error handling
             numeric_before = len(df)
-            df['value'] = pd.to_numeric(df['value'], errors='coerce')
-            df = df.dropna(subset=['value'])
-            numeric_removed = numeric_before - len(df)
-            if numeric_removed > 0:
-                print(f"⚠️ Warning: {numeric_removed} records with invalid numeric values removed")
+            
+            # Handle different value column names
+            value_column = None
+            if 'avg_value' in df.columns:
+                value_column = 'avg_value'
+            elif 'value' in df.columns:
+                value_column = 'value'
+            
+            if value_column:
+                df[value_column] = pd.to_numeric(df[value_column], errors='coerce')
+                df = df.dropna(subset=[value_column])
+                numeric_removed = numeric_before - len(df)
+                if numeric_removed > 0:
+                    print(f"⚠️ Warning: {numeric_removed} records with invalid numeric values removed")
+            else:
+                print("⚠️ Warning: No recognized value column found for numeric validation")
             
             # Data quality assessment
             quality_issues = self._assess_data_quality(df)
@@ -1775,6 +1818,97 @@ class UnifiedParser:
             traceback.print_exc()
             return pd.DataFrame()
 
+    def _merge_equivalent_parameters(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Merge equivalent parameters as specified in requirements:
+        - magnetronFlow + CoolingmagnetronFlowLowStatistics → "Magnetron Flow" (L/min)
+        - targetAndCirculatorFlow + CoolingtargetFlowLowStatistics → "Target & Circulator Flow" (L/min)
+        """
+        if df.empty or not self.enhanced_mapper:
+            return df
+        
+        merged_df = df.copy()
+        
+        # Group records by unified parameter names for merging
+        merge_groups = {}
+        
+        for unified_name, source_params in self.enhanced_mapper.merged_parameters.items():
+            # Find records that match any of the source parameters
+            mask = merged_df['source_parameter'].isin(source_params) if 'source_parameter' in merged_df.columns else False
+            if isinstance(mask, bool) and not mask:
+                # Fallback to parameter_type matching
+                mask = merged_df['parameter_type'].isin(source_params) if 'parameter_type' in merged_df.columns else pd.Series([False] * len(merged_df))
+            
+            if mask.any():
+                merge_groups[unified_name] = merged_df[mask].copy()
+        
+        # Process each merge group
+        for unified_name, group_df in merge_groups.items():
+            if len(group_df) == 0:
+                continue
+                
+            # Get unified parameter info
+            param_mapping = self.enhanced_mapper.map_parameter_name(unified_name)
+            
+            # Group by datetime for combining values at same timestamp
+            datetime_groups = group_df.groupby('datetime')
+            
+            merged_records = []
+            for datetime_str, dt_group in datetime_groups:
+                if len(dt_group) == 1:
+                    # Single record - just update metadata
+                    record = dt_group.iloc[0].copy()
+                    record['parameter_type'] = unified_name
+                    record['parameter_name'] = param_mapping['friendly_name']
+                    record['unit'] = param_mapping['unit']
+                    record['is_merged'] = True
+                    merged_records.append(record)
+                else:
+                    # Multiple records at same timestamp - merge using averaging
+                    merged_record = dt_group.iloc[0].copy()  # Use first record as base
+                    
+                    # Combine statistical values using weighted averages
+                    total_count = dt_group['count'].sum()
+                    if total_count > 0:
+                        # Weighted average for avg_value
+                        weighted_avg = (dt_group['avg_value'] * dt_group['count']).sum() / total_count
+                        merged_record['avg_value'] = weighted_avg
+                        merged_record['count'] = total_count
+                        
+                        # Take extreme values for min/max
+                        merged_record['min_value'] = dt_group['min_value'].min()
+                        merged_record['max_value'] = dt_group['max_value'].max()
+                    
+                    # Update metadata
+                    merged_record['parameter_type'] = unified_name
+                    merged_record['parameter_name'] = param_mapping['friendly_name']
+                    merged_record['unit'] = param_mapping['unit']
+                    merged_record['is_merged'] = True
+                    merged_record['source_parameter'] = ', '.join(dt_group['source_parameter'].unique()) if 'source_parameter' in dt_group.columns else unified_name
+                    
+                    merged_records.append(merged_record)
+            
+            # Remove original records and add merged ones
+            if merged_records:
+                # Remove source records from main dataframe
+                source_params = self.enhanced_mapper.merged_parameters[unified_name]
+                if 'source_parameter' in merged_df.columns:
+                    remove_mask = merged_df['source_parameter'].isin(source_params)
+                else:
+                    remove_mask = merged_df['parameter_type'].isin(source_params)
+                
+                merged_df = merged_df[~remove_mask]
+                
+                # Add merged records
+                merged_records_df = pd.DataFrame(merged_records)
+                merged_df = pd.concat([merged_df, merged_records_df], ignore_index=True)
+        
+        # Sort by datetime for proper ordering
+        if 'datetime' in merged_df.columns:
+            merged_df = merged_df.sort_values('datetime').reset_index(drop=True)
+        
+        return merged_df
+
 
     # Utility Methods
     def get_supported_parameters(self) -> Dict:
@@ -1969,15 +2103,31 @@ class UnifiedParser:
         import time
         
         self.parsing_stats["parsing_end_time"] = time.time()
-        self.parsing_stats["valid_records_extracted"] = len(cleaned_df)
-        self.parsing_stats["skipped_records"] = raw_records_count - len(cleaned_df)
+        
+        # Use pre-calculated values from parsing process
+        if "valid_records_extracted" not in self.parsing_stats:
+            self.parsing_stats["valid_records_extracted"] = len(cleaned_df)
+        
+        if "skipped_records" not in self.parsing_stats:
+            self.parsing_stats["skipped_records"] = raw_records_count - len(cleaned_df)
         
         if not cleaned_df.empty:
-            # Count unique parameters
-            if 'param' in cleaned_df.columns:
-                self.parsing_stats["parameters_detected"] = cleaned_df['param'].nunique()
-            elif 'parameter_type' in cleaned_df.columns:
-                self.parsing_stats["parameters_detected"] = cleaned_df['parameter_type'].nunique()
+            # Count unique parameters in the final dataset
+            if 'parameter_type' in cleaned_df.columns:
+                unique_params = cleaned_df['parameter_type'].nunique()
+                # Only update if we haven't tracked this during parsing
+                if self.parsing_stats["parameters_detected"] == 0:
+                    self.parsing_stats["parameters_detected"] = unique_params
+                    
+            # Count merged parameters if available
+            if 'is_merged' in cleaned_df.columns:
+                merged_count = cleaned_df['is_merged'].sum()
+                self.parsing_stats["merged_parameters"] = int(merged_count)
+                
+            # Enhanced data quality statistics
+            if 'quality' in cleaned_df.columns:
+                quality_stats = cleaned_df['quality'].value_counts()
+                self.parsing_stats["quality_distribution"] = quality_stats.to_dict()
             
             # Count mapped parameters (those with non-empty friendly names or units)
             if 'unit' in cleaned_df.columns:
@@ -1998,15 +2148,33 @@ class UnifiedParser:
         print(f"✅ Valid records extracted: {self.parsing_stats['valid_records_extracted']:,}")
         print(f"⏭️  Skipped records: {self.parsing_stats['skipped_records']:,}")
         
+        # Show merged parameter statistics if available
+        if self.parsing_stats.get("merged_parameters", 0) > 0:
+            print(f"🔗 Merged parameter records: {self.parsing_stats['merged_parameters']}")
+        
         if self.parsing_stats['parsing_start_time'] and self.parsing_stats['parsing_end_time']:
             processing_time = self.parsing_stats['parsing_end_time'] - self.parsing_stats['parsing_start_time']
             records_per_sec = self.parsing_stats['valid_records_extracted'] / max(processing_time, 0.001)
             print(f"⏱️  Processing time: {processing_time:.2f}s ({records_per_sec:.1f} records/sec)")
         
+        # Enhanced parameter mapper statistics
+        if self.enhanced_mapper:
+            mapper_stats = self.enhanced_mapper.get_mapping_statistics()
+            print(f"🔒 Parameter allowlist entries: {mapper_stats['allowlist_size']}")
+            print(f"🔗 Merged parameter groups: {mapper_stats['merged_parameter_groups']}")
+        
         # Log reasons for skipped records if available
         if self.parsing_stats['skipped_reasons']:
             print("\n📋 Skipped record reasons:")
             for reason, count in self.parsing_stats['skipped_reasons'].items():
-                print(f"   • {reason}: {count}")
+                percentage = (count / max(self.parsing_stats['total_lines_read'], 1)) * 100
+                print(f"   • {reason}: {count:,} ({percentage:.1f}%)")
+        
+        # Data quality summary
+        if 'quality_distribution' in self.parsing_stats:
+            print("\n📈 Data Quality Distribution:")
+            for quality, count in self.parsing_stats['quality_distribution'].items():
+                percentage = (count / max(self.parsing_stats['valid_records_extracted'], 1)) * 100
+                print(f"   • {quality}: {count:,} ({percentage:.1f}%)")
         
         print("="*60 + "\n")
