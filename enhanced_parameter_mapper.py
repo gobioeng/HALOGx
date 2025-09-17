@@ -245,13 +245,46 @@ class EnhancedParameterMapper:
                 'machine_name': config['machine_name']
             }
         
-        # Try pattern matching
-        param_lower = cleaned_param.lower()
-        param_clean = re.sub(r'[_\s]+', '', param_lower)
+    def map_parameter_name(self, raw_parameter: str) -> Dict[str, str]:
+        """
+        Map a raw parameter name to friendly name and unit using mapedname.txt
+        Enhanced with better fuzzy matching for improved parameter recognition.
         
-        # Check pattern cache
+        Args:
+            raw_parameter: Raw parameter name from log file
+            
+        Returns:
+            Dict containing friendly_name, unit, machine_name
+        """
+        if not raw_parameter:
+            return {
+                'friendly_name': 'Unknown Parameter',
+                'unit': '',
+                'machine_name': raw_parameter
+            }
+        
+        # Clean the parameter name
+        cleaned_param = self._clean_parameter_name(raw_parameter)
+        
+        # Try exact match first
+        if cleaned_param in self.parameter_mapping:
+            config = self.parameter_mapping[cleaned_param]
+            return {
+                'friendly_name': config['friendly_name'],
+                'unit': config['unit'], 
+                'machine_name': config['machine_name']
+            }
+        
+        # Enhanced pattern matching with multiple strategies
+        param_lower = cleaned_param.lower()
+        param_clean = re.sub(r'[_\s\-]+', '', param_lower)
+        
+        # Strategy 1: Check direct pattern cache matches
         for pattern, machine_name in self.pattern_cache.items():
-            if pattern in param_lower or param_clean in pattern:
+            pattern_clean = re.sub(r'[_\s\-]+', '', pattern.lower())
+            if (pattern_clean in param_clean or 
+                param_clean in pattern_clean or
+                pattern in param_lower):
                 if machine_name in self.parameter_mapping:
                     config = self.parameter_mapping[machine_name]
                     return {
@@ -260,14 +293,100 @@ class EnhancedParameterMapper:
                         'machine_name': config['machine_name']
                     }
         
-        # Check for partial matches in friendly names
+        # Strategy 2: Enhanced substring matching with scoring
+        best_match = None
+        best_score = 0
+        
         for machine_name, config in self.parameter_mapping.items():
+            machine_lower = machine_name.lower()
+            machine_clean = re.sub(r'[_\s\-]+', '', machine_lower)
             friendly_lower = config['friendly_name'].lower()
+            friendly_clean = re.sub(r'[_\s\-]+', '', friendly_lower)
             
-            # Check if any words match
+            # Calculate match score based on multiple criteria
+            score = 0
+            
+            # Exact substring matches get highest score
+            if machine_clean in param_clean or param_clean in machine_clean:
+                score += 10
+            if friendly_clean in param_clean or param_clean in friendly_clean:
+                score += 8
+            
+            # Word-based matching
             param_words = set(param_lower.split())
+            machine_words = set(machine_lower.split())
             friendly_words = set(friendly_lower.split())
             
+            # Count common words
+            machine_common = len(param_words & machine_words)
+            friendly_common = len(param_words & friendly_words)
+            
+            if machine_common > 0:
+                score += machine_common * 3
+            if friendly_common > 0:
+                score += friendly_common * 2
+            
+            # Check for keyword matches (temperature, flow, etc.)
+            important_keywords = ['temp', 'temperature', 'flow', 'pressure', 'voltage', 'humid']
+            for keyword in important_keywords:
+                if keyword in param_lower and keyword in machine_lower:
+                    score += 5
+                if keyword in param_lower and keyword in friendly_lower:
+                    score += 4
+            
+            # Pattern matches from additional patterns
+            for pattern in config.get('patterns', []):
+                pattern_clean = re.sub(r'[_\s\-]+', '', pattern.lower())
+                if pattern_clean in param_clean or param_clean in pattern_clean:
+                    score += 6
+            
+            # Track best match
+            if score > best_score:
+                best_score = score
+                best_match = config
+        
+        # Return best match if score is high enough
+        if best_match and best_score >= 3:  # Minimum threshold for matching
+            return {
+                'friendly_name': best_match['friendly_name'],
+                'unit': best_match['unit'],
+                'machine_name': best_match['machine_name']
+            }
+        
+        # Strategy 3: Fallback - return original parameter with attempted unit detection
+        detected_unit = self._detect_unit_from_name(param_lower)
+        
+        return {
+            'friendly_name': cleaned_param,
+            'unit': detected_unit,
+            'machine_name': cleaned_param
+        }
+    
+    def _detect_unit_from_name(self, param_name: str) -> str:
+        """Detect likely unit from parameter name"""
+        param_lower = param_name.lower()
+        
+        # Common unit patterns in parameter names
+        if any(word in param_lower for word in ['temp', 'temperature', 'thermal']):
+            return '°C'
+        elif any(word in param_lower for word in ['flow', 'rate']):
+            return 'L/min'
+        elif any(word in param_lower for word in ['pressure', 'psi']):
+            return 'PSI'
+        elif any(word in param_lower for word in ['voltage', 'volt']):
+            return 'V'
+        elif any(word in param_lower for word in ['current', 'amp']):
+            return 'A'
+        elif any(word in param_lower for word in ['humid', 'moisture']):
+            return '%'
+        elif any(word in param_lower for word in ['speed', 'rpm']):
+            return 'RPM'
+        elif any(word in param_lower for word in ['count', 'number']):
+            return 'count'
+        elif any(word in param_lower for word in ['time', 'duration']):
+            return 's'
+        else:
+            return ''
             if param_words & friendly_words:  # If there's any intersection
                 return {
                     'friendly_name': config['friendly_name'],
@@ -304,25 +423,59 @@ class EnhancedParameterMapper:
         
         # Clean parameter name
         cleaned = self._clean_parameter_name(parameter_name)
+        param_lower = cleaned.lower().replace('_', '').replace(' ', '').replace('-', '')
         
-        # Check if it's in our mapping
-        mapped = self.map_parameter_name(cleaned)
+        # First check exact and partial matches in our mappings
+        for machine_name, config in self.parameter_mapping.items():
+            machine_lower = machine_name.lower().replace('_', '').replace(' ', '').replace('-', '')
+            friendly_lower = config['friendly_name'].lower().replace('_', '').replace(' ', '').replace('-', '')
+            
+            # Check exact match or substring match
+            if (machine_lower == param_lower or 
+                machine_lower in param_lower or 
+                param_lower in machine_lower or
+                friendly_lower in param_lower or
+                param_lower in friendly_lower):
+                return True
+            
+            # Check pattern matches
+            for pattern in config.get('patterns', []):
+                pattern_lower = pattern.lower().replace('_', '').replace(' ', '').replace('-', '')
+                if pattern_lower in param_lower or param_lower in pattern_lower:
+                    return True
         
-        # Consider it a target parameter if:
-        # 1. It has a mapping in mapedname.txt
-        # 2. Or it contains keywords we care about
-        
-        if mapped['machine_name'] in self.parameter_mapping:
-            return True
-        
-        # Check for important keywords even if not in mapping
-        param_lower = cleaned.lower()
+        # Extended keyword matching for comprehensive data extraction
         target_keywords = [
-            'flow', 'temp', 'temperature', 'pressure', 'humidity', 'voltage', 
-            'current', 'speed', 'fan', 'pump', 'water', 'magnetron', 'target',
-            'circulator', 'sf6', 'adc', 'mlc', 'col', 'cooling', 'statistics'
+            # Water system parameters from mapedname.txt
+            'magnetronflow', 'targetandcirculatorflow', 'citywatertemp', 'citywaterflow',
+            'coolingpumphigh', 'coolingmagnetronflowlow', 'coolingtargetflowlow',
+            
+            # Temperature parameters
+            'temperature', 'temp', 'thermometer', 'thermal', 'heat', 'cool', 'cold',
+            'fanremotetemp', 'boardtemp', 'cputemp', 'ambienttemp',
+            
+            # Voltage parameters  
+            'voltage', 'volt', 'v', 'mlc', 'adc', 'chan', 'banka', 'bankb', 'mon', 'stat',
+            'onboardanalog', 'supply', 'reference', 'digital', 'proximal', 'distal',
+            
+            # Flow and pressure parameters
+            'flow', 'pressure', 'psi', 'bar', 'pump', 'water', 'liquid', 'fluid',
+            'sf6', 'gas', 'pneumatic', 'hydraulic',
+            
+            # System monitoring parameters
+            'humidity', 'humid', 'moisture', 'fan', 'fanspeed', 'speed', 'rpm',
+            'statistics', 'stat', 'logstatistics', 'monitor', 'sensor',
+            
+            # Machine components
+            'magnetron', 'target', 'circulator', 'collimator', 'gantry', 'col',
+            'beam', 'arc', 'motor', 'servo', 'encoder', 'feedback',
+            
+            # Operational parameters
+            'odometer', 'count', 'time', 'heartbeat', 'status', 'event', 'emo',
+            'motion', 'enable', 'disable', 'fault', 'alarm', 'warning'
         ]
         
+        # Check if any target keyword is in the parameter name
         return any(keyword in param_lower for keyword in target_keywords)
     
     def get_mapping_statistics(self) -> Dict:
