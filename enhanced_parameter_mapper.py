@@ -9,7 +9,7 @@ Company: gobioeng.com
 
 import os
 import re
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Set
 import pandas as pd
 
 
@@ -25,8 +25,14 @@ class EnhancedParameterMapper:
         self.reverse_mapping: Dict[str, str] = {}
         self.pattern_cache: Dict[str, str] = {}
         
+        # Strict allowlist for parameter filtering
+        self.parameter_allowlist: Set[str] = set()
+        self.merged_parameters: Dict[str, List[str]] = {}
+        
         # Load parameter mappings from mapedname.txt
         self._load_parameter_mappings()
+        self._setup_parameter_merging()
+        self._create_parameter_allowlist()
     
     def _load_parameter_mappings(self):
         """Load parameter mappings from mapedname.txt file"""
@@ -216,6 +222,92 @@ class EnhancedParameterMapper:
         
         print(f"✅ Loaded {len(default_mappings)} default parameter mappings")
     
+    def _setup_parameter_merging(self):
+        """Setup merged parameter configuration for equivalent parameters"""
+        # Define parameter groups that should be merged
+        self.merged_parameters = {
+            # Magnetron Flow - merge multiple sources into unified metric
+            "magnetronFlow": ["magnetronFlow", "CoolingmagnetronFlowLowStatistics"],
+            
+            # Target & Circulator Flow - merge multiple sources into unified metric  
+            "targetAndCirculatorFlow": ["targetAndCirculatorFlow", "CoolingtargetFlowLowStatistics"]
+        }
+        
+        print(f"✅ Configured {len(self.merged_parameters)} merged parameter groups")
+        
+        # Ensure merged parameters have proper categorization
+        for unified_name, source_params in self.merged_parameters.items():
+            if unified_name in self.parameter_mapping:
+                config = self.parameter_mapping[unified_name]
+                # Add category for trend tab organization
+                if 'flow' in unified_name.lower():
+                    config['category'] = 'Water System'
+                    config['tab'] = 'Flow'
+                    config['priority'] = 1  # High priority for merging
+                print(f"📊 Merged parameter '{unified_name}' configured with sources: {source_params}")
+    
+    def _create_parameter_allowlist(self):
+        """Create strict allowlist from mapedname.txt for parameter filtering"""
+        self.parameter_allowlist = set()
+        
+        # Add all machine names from mappings
+        for machine_name in self.parameter_mapping.keys():
+            self.parameter_allowlist.add(machine_name)
+            self.parameter_allowlist.add(machine_name.lower())
+            
+            # Add variations for better matching
+            variations = [
+                machine_name.replace('_', ''),
+                machine_name.replace(' ', ''),
+                machine_name.replace('-', ''),
+                re.sub(r'[_\s\-]+', '', machine_name.lower())
+            ]
+            self.parameter_allowlist.update(variations)
+        
+        # Add patterns from mapping configurations
+        for config in self.parameter_mapping.values():
+            for pattern in config.get('patterns', []):
+                self.parameter_allowlist.add(pattern)
+                self.parameter_allowlist.add(pattern.lower())
+        
+        print(f"🔒 Created parameter allowlist with {len(self.parameter_allowlist)} entries for strict filtering")
+    
+    def is_parameter_allowed(self, parameter_name: str) -> bool:
+        """
+        Strict parameter filtering - only allow parameters from mapedname.txt
+        This implements the core requirement for strict parameter filtering.
+        """
+        if not parameter_name:
+            return False
+        
+        # Clean parameter name for comparison
+        cleaned = self._clean_parameter_name(parameter_name)
+        param_variations = [
+            parameter_name,
+            parameter_name.lower(), 
+            cleaned,
+            cleaned.lower(),
+            re.sub(r'[_\s\-]+', '', parameter_name.lower()),
+            re.sub(r'[_\s\-]+', '', cleaned.lower())
+        ]
+        
+        # Check against allowlist
+        return any(variation in self.parameter_allowlist for variation in param_variations)
+    
+    def get_merged_parameter_sources(self, unified_name: str) -> List[str]:
+        """Get list of source parameters for a merged parameter"""
+        return self.merged_parameters.get(unified_name, [unified_name])
+    
+    def should_merge_parameter(self, parameter_name: str) -> Tuple[bool, str, List[str]]:
+        """
+        Check if parameter should be merged and return merge info
+        Returns: (should_merge, unified_name, source_parameters)
+        """
+        for unified_name, source_params in self.merged_parameters.items():
+            if parameter_name in source_params:
+                return True, unified_name, source_params
+        return False, parameter_name, [parameter_name]
+    
     def map_parameter_name(self, raw_parameter: str) -> Dict[str, str]:
         """
         Map a raw parameter name to friendly name and unit using mapedname.txt
@@ -387,19 +479,6 @@ class EnhancedParameterMapper:
             return 's'
         else:
             return ''
-            if param_words & friendly_words:  # If there's any intersection
-                return {
-                    'friendly_name': config['friendly_name'],
-                    'unit': config['unit'],
-                    'machine_name': config['machine_name']
-                }
-        
-        # Return original if no mapping found
-        return {
-            'friendly_name': cleaned_param,
-            'unit': '',
-            'machine_name': cleaned_param
-        }
     
     def get_all_parameters(self) -> List[Dict]:
         """Get list of all available parameters with their mappings"""
@@ -415,68 +494,14 @@ class EnhancedParameterMapper:
     
     def is_target_parameter(self, parameter_name: str) -> bool:
         """
-        Check if a parameter is one we want to extract based on mapedname.txt
-        This addresses the issue of not extracting enough data points.
+        Check if a parameter should be processed based on strict allowlist from mapedname.txt
+        This replaces the old keyword-based matching with strict filtering.
         """
         if not parameter_name:
             return False
         
-        # Clean parameter name
-        cleaned = self._clean_parameter_name(parameter_name)
-        param_lower = cleaned.lower().replace('_', '').replace(' ', '').replace('-', '')
-        
-        # First check exact and partial matches in our mappings
-        for machine_name, config in self.parameter_mapping.items():
-            machine_lower = machine_name.lower().replace('_', '').replace(' ', '').replace('-', '')
-            friendly_lower = config['friendly_name'].lower().replace('_', '').replace(' ', '').replace('-', '')
-            
-            # Check exact match or substring match
-            if (machine_lower == param_lower or 
-                machine_lower in param_lower or 
-                param_lower in machine_lower or
-                friendly_lower in param_lower or
-                param_lower in friendly_lower):
-                return True
-            
-            # Check pattern matches
-            for pattern in config.get('patterns', []):
-                pattern_lower = pattern.lower().replace('_', '').replace(' ', '').replace('-', '')
-                if pattern_lower in param_lower or param_lower in pattern_lower:
-                    return True
-        
-        # Extended keyword matching for comprehensive data extraction
-        target_keywords = [
-            # Water system parameters from mapedname.txt
-            'magnetronflow', 'targetandcirculatorflow', 'citywatertemp', 'citywaterflow',
-            'coolingpumphigh', 'coolingmagnetronflowlow', 'coolingtargetflowlow',
-            
-            # Temperature parameters
-            'temperature', 'temp', 'thermometer', 'thermal', 'heat', 'cool', 'cold',
-            'fanremotetemp', 'boardtemp', 'cputemp', 'ambienttemp',
-            
-            # Voltage parameters  
-            'voltage', 'volt', 'v', 'mlc', 'adc', 'chan', 'banka', 'bankb', 'mon', 'stat',
-            'onboardanalog', 'supply', 'reference', 'digital', 'proximal', 'distal',
-            
-            # Flow and pressure parameters
-            'flow', 'pressure', 'psi', 'bar', 'pump', 'water', 'liquid', 'fluid',
-            'sf6', 'gas', 'pneumatic', 'hydraulic',
-            
-            # System monitoring parameters
-            'humidity', 'humid', 'moisture', 'fan', 'fanspeed', 'speed', 'rpm',
-            'statistics', 'stat', 'logstatistics', 'monitor', 'sensor',
-            
-            # Machine components
-            'magnetron', 'target', 'circulator', 'collimator', 'gantry', 'col',
-            'beam', 'arc', 'motor', 'servo', 'encoder', 'feedback',
-            
-            # Operational parameters
-            'odometer', 'count', 'time', 'heartbeat', 'status', 'event', 'emo',
-            'motion', 'enable', 'disable', 'fault', 'alarm', 'warning'
-        ]
-        
-        # Check if any target keyword is in the parameter name
-        return any(keyword in param_lower for keyword in target_keywords)
+        # Use strict allowlist filtering - only parameters from mapedname.txt
+        return self.is_parameter_allowed(parameter_name)
     
     def get_mapping_statistics(self) -> Dict:
         """Get statistics about the parameter mappings"""
@@ -484,6 +509,8 @@ class EnhancedParameterMapper:
             'total_mappings': len(self.parameter_mapping),
             'pattern_cache_size': len(self.pattern_cache),
             'reverse_mappings': len(self.reverse_mapping),
+            'allowlist_size': len(self.parameter_allowlist),
+            'merged_parameter_groups': len(self.merged_parameters),
             'source_file': self.mapedname_file_path,
             'file_exists': os.path.exists(self.mapedname_file_path)
         }
