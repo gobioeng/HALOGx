@@ -1110,18 +1110,24 @@ class UnifiedParser:
             return "fair"
 
     def _clean_and_validate_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Clean and validate the parsed data"""
+        """Clean and validate parsed data with enhanced quality checking and error handling"""
         if df.empty:
+            print("⚠️ Warning: No data to clean - DataFrame is empty")
             return df
 
+        original_count = len(df)
+        
         try:
-            # Convert datetime
+            # Convert datetime column with better error handling
             df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce")
-
+            invalid_datetime_count = df["datetime"].isna().sum()
+            if invalid_datetime_count > 0:
+                print(f"⚠️ Warning: {invalid_datetime_count} records with invalid datetime removed")
+            
             # Remove rows with invalid datetime
-            df = df.dropna(subset=["datetime"])
-
-            # Sort by datetime
+            df = df.dropna(subset=['datetime'])
+            
+            # Sort by datetime for time series analysis
             df = df.sort_values("datetime")
 
             # Fix column names for database compatibility
@@ -1166,21 +1172,164 @@ class UnifiedParser:
             if 'raw_parameter' not in df.columns:
                 df['raw_parameter'] = df['parameter_type'] if 'parameter_type' in df.columns else None
 
-            # Remove duplicates based on available columns
+            # Enhanced data validation with parameter-specific rules
+            df = self._validate_parameter_values(df)
+            
+            # Remove duplicates while preserving data variety
             duplicate_columns = ["datetime", "serial_number", "parameter_type", "statistic_type"]
-            df = df.drop_duplicates(subset=duplicate_columns)
+            df = df.drop_duplicates(subset=duplicate_columns, keep='first')
+            duplicates_removed = original_count - len(df)
+            if duplicates_removed > 0:
+                print(f"📊 Info: {duplicates_removed} duplicate records removed")
+            
+            # Validate numeric values with better error handling
+            numeric_before = len(df)
+            df['value'] = pd.to_numeric(df['value'], errors='coerce')
+            df = df.dropna(subset=['value'])
+            numeric_removed = numeric_before - len(df)
+            if numeric_removed > 0:
+                print(f"⚠️ Warning: {numeric_removed} records with invalid numeric values removed")
+            
+            # Data quality assessment
+            quality_issues = self._assess_data_quality(df)
+            if quality_issues:
+                print(f"🔍 Data quality issues detected: {', '.join(quality_issues[:3])}{'...' if len(quality_issues) > 3 else ''}")
 
             # Reset index
             df = df.reset_index(drop=True)
-
-            print(f"✓ Data cleaned: {len(df)} records ready for database")
+            
+            # Final validation summary
+            final_count = len(df)
+            data_retention = (final_count / original_count) * 100 if original_count > 0 else 0
+            
+            print(f"✓ Data cleaned: {final_count} records ready for database (retention: {data_retention:.1f}%)")
+            
+            if data_retention < 50:
+                print("⚠️ Warning: Low data retention - check log file format and parameter mappings")
 
         except Exception as e:
-            print(f"Error cleaning data: {e}")
+            print(f"❌ Error during data cleaning: {e}")
             import traceback
             traceback.print_exc()
 
         return df
+    
+    def _validate_parameter_values(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Validate parameter values against expected ranges"""
+        if df.empty:
+            return df
+            
+        validated_df = df.copy()
+        
+        # Ensure value column is numeric before validation
+        if 'value' in validated_df.columns:
+            validated_df['value'] = pd.to_numeric(validated_df['value'], errors='coerce')
+            # Remove rows where value couldn't be converted to numeric
+            validated_df = validated_df.dropna(subset=['value'])
+        
+        # Apply parameter-specific validation rules
+        for param_type in validated_df['parameter_type'].unique():
+            param_data = validated_df[validated_df['parameter_type'] == param_type]
+            
+            if param_data.empty:
+                continue
+                
+            # Get expected range for this parameter
+            expected_range = self._get_parameter_range(param_type)
+            
+            if expected_range:
+                min_val, max_val = expected_range
+                
+                try:
+                    # Flag values outside expected range
+                    mask = (param_data['value'] < min_val) | (param_data['value'] > max_val)
+                    outliers = mask.sum()
+                    
+                    if outliers > 0:
+                        # Mark as poor quality instead of removing
+                        validated_df.loc[
+                            (validated_df['parameter_type'] == param_type) & mask, 
+                            'data_quality'
+                        ] = 'poor'
+                        
+                        if outliers <= 5:  # Only show details for small number of outliers
+                            print(f"🔍 Found {outliers} outliers for {param_type} (expected: {min_val}-{max_val})")
+                except Exception as e:
+                    # Skip validation for this parameter if there are data type issues
+                    print(f"⚠️ Skipping validation for {param_type}: {str(e)[:50]}")
+                    continue
+        
+        return validated_df
+    
+    def _get_parameter_range(self, param_type: str) -> Optional[Tuple[float, float]]:
+        """Get expected range for a parameter type"""
+        # Parameter-specific ranges based on typical LINAC values
+        ranges = {
+            'magnetronFlow': (8.0, 18.0),
+            'targetAndCirculatorFlow': (8.0, 18.0),
+            'magnetronTemp': (20.0, 80.0),
+            'targetAndCirculatorTemp': (20.0, 80.0),
+            'sf6GasPressure': (10.0, 50.0),
+            'boardTemperature': (20.0, 80.0),
+            'cpuTemperatureSensor0': (20.0, 80.0),
+            'cpuTemperatureSensor1': (20.0, 80.0),
+            'humidity': (0.0, 100.0),
+            'fanSpeed': (0.0, 5000.0),
+        }
+        
+        # Try exact match first
+        if param_type in ranges:
+            return ranges[param_type]
+        
+        # Try partial matching for common parameter types
+        param_lower = param_type.lower()
+        if 'temp' in param_lower:
+            return (20.0, 80.0)  # Generic temperature range
+        elif 'flow' in param_lower:
+            return (0.0, 25.0)   # Generic flow range
+        elif 'pressure' in param_lower:
+            return (0.0, 100.0)  # Generic pressure range
+        elif 'humidity' in param_lower:
+            return (0.0, 100.0)  # Humidity percentage
+        elif 'voltage' in param_lower or 'volt' in param_lower:
+            return (-100.0, 100.0)  # Generic voltage range
+        
+        return None
+    
+    def _assess_data_quality(self, df: pd.DataFrame) -> List[str]:
+        """Assess overall data quality and return list of issues"""
+        issues = []
+        
+        if df.empty:
+            issues.append("No data available")
+            return issues
+        
+        # Check for time gaps
+        if 'datetime' in df.columns and len(df) > 1:
+            time_diffs = df['datetime'].diff().dt.total_seconds()
+            large_gaps = (time_diffs > 3600).sum()  # More than 1 hour gaps
+            if large_gaps > 0:
+                issues.append(f"{large_gaps} large time gaps")
+        
+        # Check for stuck sensors (repeated values)
+        for param_type in df['parameter_type'].unique()[:10]:  # Check top 10 parameters
+            param_data = df[df['parameter_type'] == param_type]['value']
+            if len(param_data) > 5:
+                unique_values = param_data.nunique()
+                if unique_values == 1:
+                    issues.append(f"Stuck sensor: {param_type}")
+                elif unique_values / len(param_data) < 0.1:
+                    issues.append(f"Low variability: {param_type}")
+        
+        # Check for negative values where they shouldn't exist
+        for param_type in ['flow', 'pressure', 'humidity']:
+            param_mask = df['parameter_type'].str.contains(param_type, case=False, na=False)
+            if param_mask.any():
+                negative_count = (df[param_mask]['value'] < 0).sum()
+                if negative_count > 0:
+                    issues.append(f"Negative {param_type} values: {negative_count}")
+        
+        return issues
 
     # Fault Code Parsing Methods
     def load_fault_codes_from_file(self, file_path, source_type='uploaded'):
