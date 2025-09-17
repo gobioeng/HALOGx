@@ -93,8 +93,10 @@ class EnhancedParameterMapper:
                     friendly_name = parts[1] 
                     unit = parts[2]
                     
-                    # Validate that we have all required fields
-                    if machine_name and friendly_name and unit:
+                    # Validate that we have all required fields and skip header lines
+                    if (machine_name and friendly_name and unit and 
+                        machine_name.lower() != 'machine log name' and 
+                        friendly_name.lower() != 'user-friendly name'):
                         return (machine_name, friendly_name, unit)
                         
         except Exception as e:
@@ -239,7 +241,8 @@ class EnhancedParameterMapper:
             'total_mappings': len(self.parameter_mapping),
             'allowlist_size': len(self.parameter_allowlist),
             'merged_parameter_groups': len(self.merged_parameters),
-            'source_file': self.mapedname_file_path
+            'source_file': self.mapedname_file_path,
+            'unique_parameters': len(self.parameter_mapping) - len(self.merged_parameters)  # Subtract merged groups to avoid double counting
         }
 
     def get_categories(self) -> Dict[str, List[str]]:

@@ -589,20 +589,7 @@ class UnifiedParser:
                 
                 # Detect if this is tab-separated format (new LINAC format)
                 if '\t' in line and line.count('\t') >= 7:
-                    # Parse as tab-separated LINAC format
-                    parsed_records = self._parse_tab_separated_line(line, line_number)
-                    records.extend(parsed_records)
-                else:
-                    # Early filtering - skip lines without statistics patterns
-                    has_statistics = any(keyword in line.lower() for keyword in [
-                        'count=', 'avg=', 'statistics', 'stat', 'max=', 'min=', 
-                        'value=', 'reading=', 'measurement='
-                    ])
-                    
-                    if not has_statistics:
-                        continue
-
-                    # STRICT PARAMETER FILTERING - Early check for mapped parameters only
+                    # STRICT PARAMETER FILTERING for tab-separated format
                     if self.enhanced_mapper:
                         line_lower = line.lower()
                         # Use O(1) set lookup for performance
@@ -615,8 +602,42 @@ class UnifiedParser:
                             self.parsing_stats["skipped_records"] += 1
                             self.parsing_stats["skipped_reasons"]["unmapped_parameter"] = self.parsing_stats["skipped_reasons"].get("unmapped_parameter", 0) + 1
                             continue
+                        
+                        # Note: parameters_detected will be set from final unique dataset
                     
-                    self.parsing_stats["parameters_detected"] += 1
+                    # Parse as tab-separated LINAC format
+                    parsed_records = self._parse_tab_separated_line(line, line_number)
+                    if parsed_records:
+                        self.parsing_stats["parameters_allowed"] += len(parsed_records)
+                    records.extend(parsed_records)
+                else:
+                    # Early filtering - skip lines without statistics patterns
+                    has_statistics = any(keyword in line.lower() for keyword in [
+                        'count=', 'avg=', 'statistics', 'stat', 'max=', 'min=', 
+                        'value=', 'reading=', 'measurement='
+                    ])
+                    
+                    if not has_statistics:
+                        continue
+
+                    # STRICT PARAMETER FILTERING - Only process mapped parameters from mapedname.txt
+                    if self.enhanced_mapper:
+                        line_lower = line.lower()
+                        # Use O(1) set lookup for performance
+                        has_allowed_param = any(
+                            param_var in line_lower 
+                            for param_var in self.enhanced_mapper.parameter_variations
+                        )
+                        if not has_allowed_param:
+                            self.parsing_stats["parameters_skipped"] += 1
+                            self.parsing_stats["skipped_records"] += 1
+                            self.parsing_stats["skipped_reasons"]["unmapped_parameter"] = self.parsing_stats["skipped_reasons"].get("unmapped_parameter", 0) + 1
+                            continue
+                        
+                        # Note: parameters_detected will be set from final unique dataset
+                    else:
+                        # Fallback: enhanced mapper not available
+                        pass
 
                     parsed_records = self._parse_line_optimized(line, line_number, 
                                                               water_pattern, datetime_pattern, 
@@ -735,6 +756,11 @@ class UnifiedParser:
         match = log_stats_pattern.search(message)
         if match:
             param_name = match.group(1).strip()
+            
+            # STRICT PARAMETER FILTERING - Check if parameter is allowed before processing
+            if self.enhanced_mapper and not self.enhanced_mapper.is_parameter_allowed(param_name):
+                return records  # Return empty list if parameter not allowed
+            
             count = match.group(2)
             max_val = match.group(3)
             min_val = match.group(4)
@@ -1089,7 +1115,7 @@ class UnifiedParser:
         
         # Use enhanced parameter mapper if available
         if self.enhanced_mapper:
-            return self.enhanced_mapper.is_target_parameter(param_name)
+            return self.enhanced_mapper.is_parameter_allowed(param_name)
         
         # Fallback to original logic with expanded keywords
         # Clean parameter name - remove logStatistics prefix if present
@@ -2149,11 +2175,14 @@ class UnifiedParser:
             self.parsing_stats["skipped_records"] = raw_records_count - len(cleaned_df)
         
         if not cleaned_df.empty:
-            # Count unique parameters in the final dataset
+            # Count unique parameters in the final dataset for validation
             if 'parameter_type' in cleaned_df.columns:
                 unique_params = cleaned_df['parameter_type'].nunique()
-                # Update parameters detected from final dataset
+                # Set parameters detected to the actual unique parameters in final dataset
                 self.parsing_stats["parameters_detected"] = unique_params
+                
+                # Store unique parameters count separately for logging
+                self.parsing_stats["unique_parameters_in_dataset"] = unique_params
                     
             # Count merged parameters if available
             if 'is_merged' in cleaned_df.columns:
@@ -2180,20 +2209,36 @@ class UnifiedParser:
         print("✅ Parsing Summary:")
         print(f"📄 File: {os.path.basename(file_path)}")
         print(f"📊 Total lines read: {self.parsing_stats['total_lines_read']:,}")
-        print(f"🔍 Parameters detected: {self.parsing_stats['parameters_detected']}")
-        print(f"🗺️  Parameters mapped: {self.parsing_stats['parameters_mapped']}")
+        
+        # Enhanced parameter mapper statistics - show first for strict filtering mode
+        if self.enhanced_mapper:
+            mapper_stats = self.enhanced_mapper.get_mapping_statistics()
+            print(f"🔍 Parameters matched: {self.parsing_stats['parameters_detected']} (from {mapper_stats['total_mappings']} in mapedname.txt)")
+            print(f"🔒 Parameter allowlist entries: {mapper_stats['allowlist_size']}")
+            print(f"🔗 Merged parameter groups: {mapper_stats['merged_parameter_groups']}")
+        else:
+            print(f"🔍 Parameters detected: {self.parsing_stats['parameters_detected']}")
+            print(f"🗺️  Parameters mapped: {self.parsing_stats['parameters_mapped']}")
+        
         print(f"✅ Valid records extracted: {self.parsing_stats['valid_records_extracted']:,}")
         print(f"⏭️  Skipped records: {self.parsing_stats['skipped_records']:,}")
         
-        # Show parameter filtering statistics
-        if self.parsing_stats.get("parameters_allowed", 0) > 0:
-            print(f"🔒 Parameters allowed (from mapedname.txt): {self.parsing_stats['parameters_allowed']}")
-        if self.parsing_stats.get("parameters_skipped", 0) > 0:
-            print(f"🚫 Parameters skipped (not in mapedname.txt): {self.parsing_stats['parameters_skipped']}")
+        # Show parameter filtering statistics only in enhanced mapper mode
+        if self.enhanced_mapper:
+            if self.parsing_stats.get("parameters_allowed", 0) > 0:
+                print(f"🔓 Valid parameter data found: {self.parsing_stats['parameters_allowed']} occurrences")
+            if self.parsing_stats.get("parameters_skipped", 0) > 0:
+                print(f"🚫 Parameters skipped (not in mapedname.txt): {self.parsing_stats['parameters_skipped']}")
+        else:
+            # Legacy mode - show traditional statistics
+            if self.parsing_stats.get("parameters_allowed", 0) > 0:
+                print(f"🔒 Parameters allowed: {self.parsing_stats['parameters_allowed']}")
+            if self.parsing_stats.get("parameters_skipped", 0) > 0:
+                print(f"🚫 Parameters skipped: {self.parsing_stats['parameters_skipped']}")
         
-        # Show merged parameter statistics if available
+        # Show merged parameter statistics if available (data points, not parameter count)
         if self.parsing_stats.get("merged_parameter_records", 0) > 0:
-            print(f"🔗 Merged parameter records: {self.parsing_stats['merged_parameter_records']}")
+            print(f"🔗 Merged data records: {self.parsing_stats['merged_parameter_records']} (data points combined from equivalent parameters)")
         
         if self.parsing_stats['parsing_start_time'] and self.parsing_stats['parsing_end_time']:
             processing_time = self.parsing_stats['parsing_end_time'] - self.parsing_stats['parsing_start_time']
@@ -2213,12 +2258,13 @@ class UnifiedParser:
                 percentage = (count / max(self.parsing_stats['total_lines_read'], 1)) * 100
                 print(f"   • {reason}: {count:,} ({percentage:.1f}%)")
         
-        # Show filtering efficiency
-        total_params = self.parsing_stats['parameters_detected']
-        allowed_params = self.parsing_stats.get('parameters_allowed', 0)
-        if total_params > 0:
-            efficiency = (allowed_params / total_params) * 100
-            print(f"\n📊 Filtering Efficiency: {efficiency:.1f}% of detected parameters were mapped")
+        # Show filtering efficiency only in legacy mode
+        if not self.enhanced_mapper:
+            total_params = self.parsing_stats['parameters_detected'] 
+            allowed_params = self.parsing_stats.get('parameters_allowed', 0)
+            if total_params > 0:
+                efficiency = (allowed_params / total_params) * 100
+                print(f"\n📊 Filtering Efficiency: {efficiency:.1f}% of detected parameters were mapped")
         
         # Data quality summary
         if 'quality_distribution' in self.parsing_stats:
