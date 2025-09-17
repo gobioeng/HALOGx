@@ -278,9 +278,9 @@ class HALogApp:
                         self.optimized_parser = startup_optimizer.get_precompiled_parser()
                         print("✓ Using precompiled optimized parser for maximum performance")
                     else:
-                        from optimized_parser import get_optimized_parser
-                        self.optimized_parser = get_optimized_parser()
-                        print("✓ Optimized parser initialized")
+                        from unified_parser import UnifiedParser
+                        self.unified_parser = UnifiedParser()
+                        print("✓ Unified parser initialized")
 
                     # Initialize fault notes manager
                     from fault_notes_manager import FaultNotesManager
@@ -901,12 +901,15 @@ class HALogApp:
                         print("🔧 Initializing trend controls with runtime optimization")
                         
                         # Use optimized parser for faster parameter categorization
-                        if not hasattr(self, 'optimized_parser'):
-                            from optimized_parser import get_optimized_parser
-                            self.optimized_parser = get_optimized_parser()
+                        if not hasattr(self, 'unified_parser'):
+                            from unified_parser import UnifiedParser
+                            self.unified_parser = UnifiedParser()
                         
-                        # Get parameter categories from hardcoded mapper for fast initialization
-                        categories = self.optimized_parser.get_parameter_categories()
+                        # Get parameter categories from enhanced mapper for trend tabs
+                        if hasattr(self.unified_parser, 'enhanced_mapper') and self.unified_parser.enhanced_mapper:
+                            categories = self.unified_parser.enhanced_mapper.get_categories()
+                        else:
+                            categories = {}
                         print(f"🔧 Processing {len(categories)} parameter categories")
                         
                         # Get parameters by category using optimized mapper
@@ -1205,12 +1208,15 @@ class HALogApp:
                         return pd.DataFrame()
 
                     # Use optimized parser's parameter mapper for fast lookup
-                    if not hasattr(self, 'optimized_parser'):
-                        from optimized_parser import get_optimized_parser
-                        self.optimized_parser = get_optimized_parser()
+                    if not hasattr(self, 'unified_parser'):
+                        from unified_parser import UnifiedParser
+                        self.unified_parser = UnifiedParser()
                     
-                    # Get parameter info from hardcoded mapper
-                    param_info = self.optimized_parser.parameter_mapper.get_parameter_info(parameter_description)
+                    # Get parameter info from enhanced mapper
+                    if hasattr(self.unified_parser, 'enhanced_mapper') and self.unified_parser.enhanced_mapper:
+                        param_info = self.unified_parser.enhanced_mapper.map_parameter_name(parameter_description)
+                    else:
+                        param_info = {'friendly_name': parameter_description, 'unit': '', 'category': 'Other'}
                     if not param_info:
                         print(f"⚠️ Parameter '{parameter_description}' not found in hardcoded mappings")
                         return pd.DataFrame()

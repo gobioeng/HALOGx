@@ -54,17 +54,21 @@ class UnifiedParser:
         self.parameter_mapping = {}  # Initialize before calling _init_parameter_mapping
         self.df: Optional[pd.DataFrame] = None # Initialize df to None
         
-        # Initialize enhanced parameter mapper to use mapedname.txt
+        # Initialize enhanced parameter mapper for strict filtering
         if ENHANCED_MAPPING_AVAILABLE:
             try:
                 self.enhanced_mapper = EnhancedParameterMapper()
                 print("✅ Enhanced parameter mapper initialized - using mapedname.txt for parameter mapping")
-                print(f"📊 Loaded {self.enhanced_mapper.get_mapping_statistics()['total_mappings']} parameter mappings")
+                stats = self.enhanced_mapper.get_mapping_statistics()
+                print(f"📊 Loaded {stats['total_mappings']} parameter mappings")
+                print(f"🔒 Parameter allowlist: {stats['allowlist_size']} entries")
+                print(f"🔗 Merged parameter groups: {stats['merged_parameter_groups']}")
             except Exception as e:
                 print(f"⚠️ Error initializing enhanced mapper: {e}")
                 self.enhanced_mapper = None
         else:
             self.enhanced_mapper = None
+            print("❌ Enhanced mapping not available - strict filtering disabled")
         
         # Initialize fault code caching system for performance optimization
         if CACHING_AVAILABLE:
@@ -80,16 +84,21 @@ class UnifiedParser:
             
         self._init_parameter_mapping()  # Call after other initializations
         
-        # Initialize parsing statistics for detailed logging
+        # Initialize enhanced parsing statistics for detailed logging
         self.parsing_stats = {
             "total_lines_read": 0,
             "parameters_detected": 0,
             "parameters_mapped": 0,
+            "parameters_allowed": 0,
+            "parameters_skipped": 0,
             "valid_records_extracted": 0,
             "skipped_records": 0,
             "skipped_reasons": {},
+            "merged_parameter_records": 0,
             "parsing_start_time": None,
-            "parsing_end_time": None
+            "parsing_end_time": None,
+            "processing_time": 0,
+            "records_per_second": 0
         }
 
     def get_fault_descriptions_by_database(self, fault_code):
@@ -565,7 +574,7 @@ class UnifiedParser:
         return self._process_chunk_optimized(chunk_lines)
 
     def _process_chunk_optimized(self, chunk_lines: List[Tuple[int, str]]) -> List[Dict]:
-        """Optimized chunk processing with enhanced data extraction and strict filtering"""
+        """Optimized chunk processing with strict parameter filtering from mapedname.txt"""
         records = []
 
         # Pre-compile frequently used patterns for this chunk
@@ -584,7 +593,7 @@ class UnifiedParser:
                     parsed_records = self._parse_tab_separated_line(line, line_number)
                     records.extend(parsed_records)
                 else:
-                    # Enhanced filtering - look for statistics patterns
+                    # Early filtering - skip lines without statistics patterns
                     has_statistics = any(keyword in line.lower() for keyword in [
                         'count=', 'avg=', 'statistics', 'stat', 'max=', 'min=', 
                         'value=', 'reading=', 'measurement='
@@ -593,24 +602,27 @@ class UnifiedParser:
                     if not has_statistics:
                         continue
 
-                    # Detect potential parameter before full parsing for performance
+                    # STRICT PARAMETER FILTERING - Early check for mapped parameters only
                     if self.enhanced_mapper:
-                        # Quick check if line contains any allowed parameters
                         line_lower = line.lower()
+                        # Use O(1) set lookup for performance
                         has_allowed_param = any(
-                            param.lower() in line_lower 
-                            for param in list(self.enhanced_mapper.parameter_mapping.keys())[:10]  # Check first 10 for performance
+                            param_var in line_lower 
+                            for param_var in self.enhanced_mapper.parameter_variations
                         )
                         if not has_allowed_param:
+                            self.parsing_stats["parameters_skipped"] += 1
                             self.parsing_stats["skipped_records"] += 1
-                            self.parsing_stats["skipped_reasons"]["no_allowed_params"] = self.parsing_stats["skipped_reasons"].get("no_allowed_params", 0) + 1
+                            self.parsing_stats["skipped_reasons"]["unmapped_parameter"] = self.parsing_stats["skipped_reasons"].get("unmapped_parameter", 0) + 1
                             continue
-
+                    
                     self.parsing_stats["parameters_detected"] += 1
 
                     parsed_records = self._parse_line_optimized(line, line_number, 
                                                               water_pattern, datetime_pattern, 
                                                               datetime_alt_pattern, serial_pattern)
+                    if parsed_records:
+                        self.parsing_stats["parameters_allowed"] += len(parsed_records)
                     records.extend(parsed_records)
             except Exception as e:
                 self.parsing_stats["errors_encountered"] += 1
@@ -1909,6 +1921,9 @@ class UnifiedParser:
             
             # Remove original records and add merged ones
             if merged_records:
+                # Track merged parameter statistics
+                self.parsing_stats["merged_parameter_records"] = self.parsing_stats.get("merged_parameter_records", 0) + len(merged_records)
+                
                 # Remove source records from main dataframe
                 source_params = self.enhanced_mapper.merged_parameters[unified_name]
                 if 'source_parameter' in merged_df.columns:
@@ -1921,6 +1936,9 @@ class UnifiedParser:
                 # Add merged records
                 merged_records_df = pd.DataFrame(merged_records)
                 merged_df = pd.concat([merged_df, merged_records_df], ignore_index=True)
+                
+                # Log merging activity
+                print(f"🔗 Merged {len(merged_records)} records for '{unified_name}' from {len(source_params)} sources")
         
         # Sort by datetime for proper ordering
         if 'datetime' in merged_df.columns:
@@ -2123,25 +2141,25 @@ class UnifiedParser:
         
         self.parsing_stats["parsing_end_time"] = time.time()
         
-        # Use pre-calculated values from parsing process
-        if "valid_records_extracted" not in self.parsing_stats:
-            self.parsing_stats["valid_records_extracted"] = len(cleaned_df)
+        # Update valid records count from the final cleaned dataframe
+        self.parsing_stats["valid_records_extracted"] = len(cleaned_df)
         
-        if "skipped_records" not in self.parsing_stats:
+        # Calculate skipped records if not already tracked
+        if self.parsing_stats["skipped_records"] == 0:
             self.parsing_stats["skipped_records"] = raw_records_count - len(cleaned_df)
         
         if not cleaned_df.empty:
             # Count unique parameters in the final dataset
             if 'parameter_type' in cleaned_df.columns:
                 unique_params = cleaned_df['parameter_type'].nunique()
-                # Only update if we haven't tracked this during parsing
-                if self.parsing_stats["parameters_detected"] == 0:
-                    self.parsing_stats["parameters_detected"] = unique_params
+                # Update parameters detected from final dataset
+                self.parsing_stats["parameters_detected"] = unique_params
                     
             # Count merged parameters if available
             if 'is_merged' in cleaned_df.columns:
                 merged_count = cleaned_df['is_merged'].sum()
-                self.parsing_stats["merged_parameters"] = int(merged_count)
+                if merged_count > 0:
+                    self.parsing_stats["merged_parameter_records"] = int(merged_count)
                 
             # Enhanced data quality statistics
             if 'quality' in cleaned_df.columns:
@@ -2155,7 +2173,7 @@ class UnifiedParser:
                 self.parsing_stats["parameters_mapped"] = unique_mapped
 
     def _log_parsing_summary(self, file_path: str):
-        """Log comprehensive parsing summary as requested in requirements"""
+        """Log comprehensive parsing summary with strict filtering statistics"""
         import os
         
         print("\n" + "="*60)
@@ -2167,9 +2185,15 @@ class UnifiedParser:
         print(f"✅ Valid records extracted: {self.parsing_stats['valid_records_extracted']:,}")
         print(f"⏭️  Skipped records: {self.parsing_stats['skipped_records']:,}")
         
+        # Show parameter filtering statistics
+        if self.parsing_stats.get("parameters_allowed", 0) > 0:
+            print(f"🔒 Parameters allowed (from mapedname.txt): {self.parsing_stats['parameters_allowed']}")
+        if self.parsing_stats.get("parameters_skipped", 0) > 0:
+            print(f"🚫 Parameters skipped (not in mapedname.txt): {self.parsing_stats['parameters_skipped']}")
+        
         # Show merged parameter statistics if available
-        if self.parsing_stats.get("merged_parameters", 0) > 0:
-            print(f"🔗 Merged parameter records: {self.parsing_stats['merged_parameters']}")
+        if self.parsing_stats.get("merged_parameter_records", 0) > 0:
+            print(f"🔗 Merged parameter records: {self.parsing_stats['merged_parameter_records']}")
         
         if self.parsing_stats['parsing_start_time'] and self.parsing_stats['parsing_end_time']:
             processing_time = self.parsing_stats['parsing_end_time'] - self.parsing_stats['parsing_start_time']
@@ -2188,6 +2212,13 @@ class UnifiedParser:
             for reason, count in self.parsing_stats['skipped_reasons'].items():
                 percentage = (count / max(self.parsing_stats['total_lines_read'], 1)) * 100
                 print(f"   • {reason}: {count:,} ({percentage:.1f}%)")
+        
+        # Show filtering efficiency
+        total_params = self.parsing_stats['parameters_detected']
+        allowed_params = self.parsing_stats.get('parameters_allowed', 0)
+        if total_params > 0:
+            efficiency = (allowed_params / total_params) * 100
+            print(f"\n📊 Filtering Efficiency: {efficiency:.1f}% of detected parameters were mapped")
         
         # Data quality summary
         if 'quality_distribution' in self.parsing_stats:
