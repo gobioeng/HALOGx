@@ -79,6 +79,18 @@ class UnifiedParser:
             print("⚠️ Operating without fault code caching")
             
         self._init_parameter_mapping()  # Call after other initializations
+        
+        # Initialize parsing statistics for detailed logging
+        self.parsing_stats = {
+            "total_lines_read": 0,
+            "parameters_detected": 0,
+            "parameters_mapped": 0,
+            "valid_records_extracted": 0,
+            "skipped_records": 0,
+            "skipped_reasons": {},
+            "parsing_start_time": None,
+            "parsing_end_time": None
+        }
 
     def get_fault_descriptions_by_database(self, fault_code):
         """Get fault descriptions from both HAL and TB databases"""
@@ -486,6 +498,13 @@ class UnifiedParser:
         cancel_callback=None,
     ) -> pd.DataFrame:
         """Parse LINAC log file with optimized chunked processing for large files"""
+        import time
+        
+        # Initialize parsing statistics
+        self.parsing_stats["parsing_start_time"] = time.time()
+        self.parsing_stats["total_lines_read"] = 0
+        self.parsing_stats["skipped_reasons"] = {}
+        
         records = []
 
         try:
@@ -507,6 +526,7 @@ class UnifiedParser:
                         break
 
                     line_number += 1
+                    self.parsing_stats["total_lines_read"] += 1
                     line = line.strip()
 
                     # Skip empty lines early
@@ -540,7 +560,13 @@ class UnifiedParser:
             self.parsing_stats["errors_encountered"] += 1
 
         df = pd.DataFrame(records)
-        return self._clean_and_validate_data(df)
+        cleaned_df = self._clean_and_validate_data(df)
+        
+        # Update parsing statistics and log summary
+        self._update_parsing_statistics(len(records), cleaned_df)
+        self._log_parsing_summary(file_path)
+        
+        return cleaned_df
 
     def _process_chunk(self, chunk_lines: List[Tuple[int, str]]) -> List[Dict]:
         """Process a chunk of lines (legacy method for compatibility)"""
@@ -1937,3 +1963,50 @@ class UnifiedParser:
 
         except Exception as e:
             return pd.DataFrame()
+
+    def _update_parsing_statistics(self, raw_records_count: int, cleaned_df: pd.DataFrame):
+        """Update parsing statistics based on parsing results"""
+        import time
+        
+        self.parsing_stats["parsing_end_time"] = time.time()
+        self.parsing_stats["valid_records_extracted"] = len(cleaned_df)
+        self.parsing_stats["skipped_records"] = raw_records_count - len(cleaned_df)
+        
+        if not cleaned_df.empty:
+            # Count unique parameters
+            if 'param' in cleaned_df.columns:
+                self.parsing_stats["parameters_detected"] = cleaned_df['param'].nunique()
+            elif 'parameter_type' in cleaned_df.columns:
+                self.parsing_stats["parameters_detected"] = cleaned_df['parameter_type'].nunique()
+            
+            # Count mapped parameters (those with non-empty friendly names or units)
+            if 'unit' in cleaned_df.columns:
+                mapped_count = cleaned_df[cleaned_df['unit'].notna() & (cleaned_df['unit'] != '')].shape[0]
+                unique_mapped = cleaned_df[cleaned_df['unit'].notna() & (cleaned_df['unit'] != '')]['param'].nunique() if 'param' in cleaned_df.columns else 0
+                self.parsing_stats["parameters_mapped"] = unique_mapped
+
+    def _log_parsing_summary(self, file_path: str):
+        """Log comprehensive parsing summary as requested in requirements"""
+        import os
+        
+        print("\n" + "="*60)
+        print("✅ Parsing Summary:")
+        print(f"📄 File: {os.path.basename(file_path)}")
+        print(f"📊 Total lines read: {self.parsing_stats['total_lines_read']:,}")
+        print(f"🔍 Parameters detected: {self.parsing_stats['parameters_detected']}")
+        print(f"🗺️  Parameters mapped: {self.parsing_stats['parameters_mapped']}")
+        print(f"✅ Valid records extracted: {self.parsing_stats['valid_records_extracted']:,}")
+        print(f"⏭️  Skipped records: {self.parsing_stats['skipped_records']:,}")
+        
+        if self.parsing_stats['parsing_start_time'] and self.parsing_stats['parsing_end_time']:
+            processing_time = self.parsing_stats['parsing_end_time'] - self.parsing_stats['parsing_start_time']
+            records_per_sec = self.parsing_stats['valid_records_extracted'] / max(processing_time, 0.001)
+            print(f"⏱️  Processing time: {processing_time:.2f}s ({records_per_sec:.1f} records/sec)")
+        
+        # Log reasons for skipped records if available
+        if self.parsing_stats['skipped_reasons']:
+            print("\n📋 Skipped record reasons:")
+            for reason, count in self.parsing_stats['skipped_reasons'].items():
+                print(f"   • {reason}: {count}")
+        
+        print("="*60 + "\n")
